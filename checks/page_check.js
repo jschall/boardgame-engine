@@ -21,8 +21,9 @@ else if (pos.some((p, i) => i && p < pos[i - 1])) bad.push('sections out of orde
    pages had tabs (data-mode="table" / "parts"). Either shape is complete. */
 const nav = html.includes('data-open="parts"') && html.includes('data-open="rules"') && html.includes('data-open="files"');
 if (!nav) for (const m of ['data-mode="table"', 'data-mode="parts"']) if (!html.includes(m)) bad.push('stage tab missing: ' + m + ' (or a nav with data-open="rules|parts|files")');
-if (html.includes('id="track"') && !/id="(scrollhint|btn-skip)"/.test(html)) bad.push('a scroll-driven opening (#track) needs its Skip button (#btn-skip, or the older #scrollhint)');
-if (html.includes('id="track"') && !/id="loading"/.test(html)) bad.push('a scroll-driven opening needs the #loading screen shown until the first frame (owner: "a loading animation until we\'re ready to display")');
+if (html.includes('id="track"')) bad.push('a scroll track (#track): the opening is run by the box button now (owner, 2026-09-18), nothing scrolls');
+if (!/id="btn-box"/.test(html)) bad.push('no #btn-box: the one button that opens and closes the box');
+if (!/id="loading"/.test(html)) bad.push('no #loading screen shown until the first frame (owner: "a loading animation until we\'re ready to display")');
 if (!html.includes('id="log"')) bad.push('no #log element (the single scrolling action log)');
 if (!/\.log\s*\{[^}]*height\s*:/.test(html)) bad.push('.log has no fixed height in CSS');
 if (/<(script|link|img)[^>]+(src|href)="https?:\/\//.test(html)) bad.push('external resource reference: the page must be self-contained');

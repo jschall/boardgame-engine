@@ -1,6 +1,6 @@
 /* page.js (boardgame-engine): the stage, the game and the files section. Machinery shared by every game: the 3D scene, the shoulder box, the
    parts viewer, the modes and modals, the timing, log and chips, the demo loop and the QA contract, the sheet cards and lightbox, the stock inputs
-   and the geometry worker, and the scroll-driven opening. The game itself is GameTable(api): the table layout, initTable, setBoardFromState,
+   and the geometry worker, and the opening the box button runs. The game itself is GameTable(api): the table layout, initTable, setBoardFromState,
    animateEvents, assertLegal, noteShown, syncBoard, finale, the assemblies and part groups (engine/README.md lists the contract; a game's table.js
    is the worked example). Globals from build.js: PARTS, LAYOUT, SHEETS, META, PACKING, JIG, SHOWCASE, GEOM_SOURCES, FONTS, ENG_CACHE, GameSim,
    GameTable, CutView, Render3D. */

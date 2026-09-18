@@ -1,6 +1,6 @@
 /* page.js (boardgame-engine): the stage, the game and the files section. Machinery shared by every game: the 3D scene, the shoulder box, the
    parts viewer, the modes and modals, the timing, log and chips, the demo loop and the QA contract, the sheet cards and lightbox, the stock inputs
-   and the geometry worker, and the scroll-driven opening. The game itself is GameTable(api): the table layout, initTable, setBoardFromState,
+   and the geometry worker, and the opening the box button runs. The game itself is GameTable(api): the table layout, initTable, setBoardFromState,
    animateEvents, assertLegal, noteShown, syncBoard, finale, the assemblies and part groups (engine/README.md lists the contract; a game's table.js
    is the worked example). Globals from build.js: PARTS, LAYOUT, SHEETS, META, PACKING, JIG, SHOWCASE, GEOM_SOURCES, FONTS, ENG_CACHE, GameSim,
    GameTable, CutView, Render3D. */
@@ -231,8 +231,8 @@
       dirty = true; });
     cv.addEventListener('pointerup', () => { drag = null; }); cv.addEventListener('pointercancel', () => { drag = null; });
     cv.addEventListener('contextmenu', e => e.preventDefault());
-    /* the wheel scrolls the page (up closes the box again); ctrl + wheel, which is also a trackpad pinch, zooms the view */
-    cv.addEventListener('wheel', e => { if (INTRO.live || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); sc.setView({ view: Math.max(20, Math.min(4000, sc.opts.view * Math.exp(e.deltaY * 0.0012))) }); dirty = true; }, { passive: false });
+    /* the wheel (and a trackpad pinch, which arrives as ctrl + wheel) zooms the view once the box is open; nothing during the opening */
+    cv.addEventListener('wheel', e => { e.preventDefault(); if (INTRO.live) return; sc.setView({ view: Math.max(20, Math.min(4000, sc.opts.view * Math.exp(e.deltaY * 0.0012))) }); dirty = true; }, { passive: false });
   })(canvas, scene);
   window.addEventListener('resize', () => { scene.resize(); dirty = true; });
 
@@ -584,16 +584,20 @@
     else stockStatus('The files below are drawn for this stock. Change a thickness or a kerf to regenerate them.');
   })();
 
-  /* ------------------------------------------------------------ the opening: scrolling opens the box (analysis/scroll-page-brief.md)
-     Two closed boxes stand in the dark, one showing its lid and one its underside. Scrolling dissolves the second, brings the lights and the
-     table up, lays the first box down, carries its lid across to the lid's place on the table, and flies every packed piece to where the table
-     view keeps it, top of the box first. Every frame is a function of the scroll position (smoothed a little, so wheel steps do not jolt it), so
-     the sequence runs backwards as smoothly as forwards. The table's own instances are moved: their table pose is stored first and restored the
-     moment anything else needs the table (a modal, a QA hook), so window.__placements always reports the table pose. At the bottom the game
-     starts by itself; scrolling up again returns the pieces to the table pose and re-arms the opening. The first animation frame starts the
-     opening; the headless harness draws no frame, so under fitcheck nothing here runs. */
-  const trackEl = el('track'), cueEl = el('cue'), skipEl = el('btn-skip'), hudEl = el('hud'), titleEl = el('intro-title'), spotEl = el('spot');
-  const INTRO = { pending: true, live: false, armed: false, returning: false, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], yE: 0, tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [], shot: false };
+  /* ------------------------------------------------------------ the opening: one button opens the box, the same button closes it
+     Two closed boxes stand in the dark, one showing its lid and one its underside. Open the box: the second dissolves, the lights and the table
+     come up, the first box lies down, its lid flies across to the lid's place on the table, and every packed piece flies to where the table view
+     keeps it, top of the box first; then the game starts by itself. Every frame is a function of one progress value p, run forward in time by
+     the button (OPEN_MS for the whole opening) and backward by the same button (CLOSE_MS), so the sequence runs backwards as smoothly as forwards.
+     (It was scroll-driven until 2026-09-18; the owner: "let's get rid of the scrolling mechanism and just have a button to open the box and a
+     button to close the box. scroll can go back to being zoom when the box is open.") The table's own instances are moved: their table pose is
+     stored first and restored the moment anything else needs the table (a modal, a QA hook), so window.__placements always reports the table
+     pose. Closing during the game returns the pieces to the table pose and rebuilds the opening from that table, so the very game packs into the
+     box and opening it again lets the game go on. The first animation frame starts the opening; the headless harness draws no frame, so under
+     fitcheck nothing here runs. */
+  const boxBtn = el('btn-box'), hudEl = el('hud'), titleEl = el('intro-title'), spotEl = el('spot');
+  const OPEN_MS = 10000, CLOSE_MS = 7000;   /* the owner, watching the first cut: "the opening animation is too slow. maybe double the speed" */
+  const INTRO = { pending: true, live: false, open: false, dir: 0, rate: 1, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], yE: 0, tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [], shot: false };
   const V3 = { dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
     unit: a => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; }, sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]] };
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -625,9 +629,11 @@
     inst.group = own ? (tipG ? [own, tipG] : own) : (tipG ? [tipG] : undefined);
   }
   function restore(q) { const inst = q.inst; inst.x = q.end.x; inst.y = q.end.y; inst.z = q.end.z; inst.group = undefined; inst.shadow = q.shadow0; }
-  /* the timeline, in scroll progress: one thing at a time, each settled before the next starts; the pieces from W0, scheduled below */
-  const TL = { title: [0, 0.08], fadeB: [0.07, 0.2], lights: [0.17, 0.31], tip: [0.33, 0.47], lid: [0.49, 0.61], hud: [0.95, 1] };
-  const FLY = 0.025, LIFT = 0.28, DROP = 0.1, W0 = 0.62, LID_ALT = 150;   /* a flight: a lift of LIFT x FLY, the carry, a drop of DROP x FLY; the carry stretches when the piece must land after another */
+  /* the timeline, in progress p: one thing at a time, each settled before the next starts; the pieces from W0, scheduled below. Most of the
+     time goes to the pieces (owner, 2026-09-18: "the box opening animation spends too much time on the rear-facing box fade-out and zoom, and
+     too little time spreading the pieces out") */
+  const TL = { title: [0, 0.05], fadeB: [0.03, 0.11], lights: [0.09, 0.18], tip: [0.19, 0.29], lid: [0.30, 0.39], hud: [0.95, 1] };
+  const FLY = 0.03, LIFT = 0.28, DROP = 0.1, W0 = 0.40, LID_ALT = 150;   /* a flight: a lift of LIFT x FLY, the carry, a drop of DROP x FLY; the carry stretches when the piece must land after another */
   /* the outline and stock that make two packed pieces interchangeable in a pile: any hex tile fits any hex slot */
   const outlineSig = inst => { const o = inst.part.cuts.find(k => !k.hole); if (!o) throw new Error(`${inst.part.pid} has no outline`); return inst.stock + ':' + o.pts.map(p => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10)).join(';'); };
   /* where a piece is at scroll progress p: null in the box, 'landed', or its centre and the turn still to go. One arc: it lifts out of the box
@@ -646,8 +652,11 @@
     const corners = (f, B) => { const bb = f.part.bbox, out = []; for (const u of [bb[0], bb[2]]) for (const v of [bb[1], bb[3]]) for (const h of [0, f.thick]) out.push(scene.world(B, u, v, h)); return out; };
     const box = (f, B) => { const a = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9]; for (const w of corners(f, B)) { a[0] = Math.min(a[0], w[0]); a[1] = Math.min(a[1], w[1]); a[2] = Math.min(a[2], w[2]); a[3] = Math.max(a[3], w[0]); a[4] = Math.max(a[4], w[1]); a[5] = Math.max(a[5], w[2]); } return a; };
     const localIn = (part, u, v) => { let inside = false; for (const c of part.cuts) { const r = c.pts; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if ((yi > v) !== (yj > v) && u < (xj - xi) * (v - yi) / (yj - yi) + xi) inside = !inside; } } return inside; };
-    const outer = f => { const o = f.part.cuts.find(k => !k.hole); if (!o) throw new Error(f.part.pid + ' has no outline'); const n = Math.max(1, Math.floor(o.pts.length / 36)), pts = []; const bb = f.part.bbox, cu = (bb[0] + bb[2]) / 2, cv = (bb[1] + bb[3]) / 2;
-      for (let i = 0; i < o.pts.length; i += n) { const [u, v] = o.pts[i], du = cu - u, dv = cv - v, l = Math.hypot(du, dv) || 1, w = [u + du / l * 0.7, v + dv / l * 0.7]; pts.push(localIn(f.part, w[0], w[1]) ? w : o.pts[i]); }   /* a little inside the edge, so two stacked copies register */
+    const outer = f => { const o = f.part.cuts.find(k => !k.hole); if (!o) throw new Error(f.part.pid + ' has no outline'); const L = o.pts.length, n = Math.max(1, Math.floor(L / 36)), pts = []; const bb = f.part.bbox;
+      /* a little inside the edge along its normal, so two stacked copies register; a point that is in the material on neither side (the edge
+         of a bay in the meadow frame, where a planted tile's outline lies on the frame's own cut line) is left out rather than put on the line */
+      for (let i = 0; i < L; i += n) { const [u, v] = o.pts[i], [pu, pv] = o.pts[(i + L - 1) % L], [nu, nv] = o.pts[(i + 1) % L]; let tx = nu - pu, ty = nv - pv; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
+        const c1 = [u - ty * 0.7, v + tx * 0.7], c2 = [u + ty * 0.7, v - tx * 0.7]; if (localIn(f.part, c1[0], c1[1])) pts.push(c1); else if (localIn(f.part, c2[0], c2[1])) pts.push(c2); }
       for (let a = 0; a < 5; a++) for (let b = 0; b < 5; b++) { const u = bb[0] + (bb[2] - bb[0]) * (a + 0.5) / 5, v = bb[1] + (bb[3] - bb[1]) * (b + 0.5) / 5; if (localIn(f.part, u, v)) pts.push([u, v]); }
       return pts; };
     const pts = (f, B) => outer(f).map(([u, v]) => scene.world(B, u, v, f.thick / 2));
@@ -656,8 +665,9 @@
       const O = B.O, U = B.U, V = B.V, dx = w[0] - O[0], dy = w[1] - O[1]; const u = (dx * U[0] + dy * U[1]) / (U[0] * U[0] + U[1] * U[1]), v = (dx * V[0] + dy * V[1]) / (V[0] * V[0] + V[1] * V[1]);
       return localIn(f.part, u, v); };
     const over = (a, b) => !(a[3] <= b[0] + 0.3 || b[3] <= a[0] + 0.3 || a[4] <= b[1] + 0.3 || b[4] <= a[1] + 0.3);
-    const foot = (ptsA, ptsB, fa, Ba, va, ba, fb, Bb, vb, bb) => ptsA.some(w => inSolid(fb, Bb, w, vb, bb)) || ptsB.some(w => inSolid(fa, Ba, w, va, ba));
-    return { box, pts, over, foot };
+    let lastHit = null;
+    const foot = (ptsA, ptsB, fa, Ba, va, ba, fb, Bb, vb, bb) => { const a = ptsA.find(w => inSolid(fb, Bb, w, vb, bb)); if (a) { lastHit = ['A in B', a]; return true; } const b = ptsB.find(w => inSolid(fa, Ba, w, va, ba)); if (b) { lastHit = ['B in A', b]; return true; } return false; };
+    return { box, pts, over, foot, hit: () => lastHit };
   }
   /* The flight plan. The box empties the way hands would empty it: one pile at a time, each top down, one piece every STEP of the scroll; a pile
      that has other piles stacked on it, or that pieces from other piles land on, goes after them. A piece lands only after what it lands on has
@@ -681,7 +691,7 @@
         if (a.bE[2] > b.bE[2] + 0.5) under[i].push(j); else if (b.bE[2] > a.bE[2] + 0.5) under[j].push(i);
         else if (a.vertical && b.vertical) { if (above[i].includes(j)) under[j].push(i); else if (above[j].includes(i)) under[i].push(j); else if (a.inst.part.pid < b.inst.part.pid) under[j].push(i); else under[i].push(j); }
         else if (a.vertical) under[i].push(j); else if (b.vertical) under[j].push(i);   /* a standee whose tab goes right through its tile stands on it */
-        else throw new Error(`the opening: ${a.inst.part.pid} and ${b.inst.part.pid} lie at one level on the table`);
+        else throw new Error(`the opening: ${a.inst.part.pid} and ${b.inst.part.pid} lie at one level on the table (hit ${JSON.stringify(G3.hit())}; ${a.inst.part.pid} at ${[a.inst.x, a.inst.y, a.inst.z].map(v => v.toFixed(2)).join(', ')} rot ${a.inst.rot}; ${b.inst.part.pid} at ${[b.inst.x, b.inst.y, b.inst.z].map(v => v.toFixed(2)).join(', ')} rot ${b.inst.rot})`);
       }
     }
     const seq = P.map(q => q.seq);
@@ -852,16 +862,16 @@
     IB.spotAt = [(cxA + cxB) / 2, IB.yE + 10];
     IB.cam = [
       [0.00, { pitch: 84, yaw: -24, dist: 2500, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 36, view: 560 }],
-      [0.20, { pitch: 82, yaw: -21, dist: 2350, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 26, view: 520 }],
-      [0.33, { pitch: 70, yaw: -17, dist: 1900, cx: cxA, cy: IB.yE - 30, cz: 30, view: 430 }],
-      [0.47, { pitch: 58, yaw: -12, dist: 1500, cx: cxA, cy: cyA, cz: 18, view: 400 }],
-      [0.64, { pitch: 52, yaw: -6, dist: 2000, cx: home.cx, cy: home.cy, cz: home.cz, view: T.home.view * 0.9 }],
-      [0.94, Object.assign({}, home, { view: T.home.view })]];
+      [0.11, { pitch: 82, yaw: -21, dist: 2350, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 26, view: 520 }],
+      [0.19, { pitch: 70, yaw: -17, dist: 1900, cx: cxA, cy: IB.yE - 30, cz: 30, view: 430 }],
+      [0.29, { pitch: 58, yaw: -12, dist: 1500, cx: cxA, cy: cyA, cz: 18, view: 400 }],
+      [0.42, { pitch: 52, yaw: -6, dist: 2000, cx: home.cx, cy: home.cy, cz: home.cz, view: home.view * 0.9, framed: true }],
+      [0.94, Object.assign({}, home, { framed: true })]];   /* framed: the view is the table's own (framed() already sized it for this viewport), so the game's first frame is the opening's last and the camera never steps */
   }
   const CAMK = ['pitch', 'yaw', 'dist', 'cx', 'cy', 'cz', 'view'];
   function introCamera(p) {
     const K = INTRO.cam, f = Math.max(1, 1.2 * scene.H / scene.W), n = K.length - 1;
-    const val = (i, k) => k === 'view' ? K[i][1][k] * f : K[i][1][k];
+    const val = (i, k) => k === 'view' && !K[i][1].framed ? K[i][1][k] * f : K[i][1][k];
     if (p <= K[0][0]) return Object.fromEntries(CAMK.map(k => [k, val(0, k)]));
     if (p >= K[n][0]) return Object.fromEntries(CAMK.map(k => [k, val(n, k)]));
     let i = 0; while (K[i + 1][0] < p) i++;
@@ -899,74 +909,75 @@
     scene.setView(introCamera(p));
     const r = seg(p, TL.hud[0], TL.hud[1]); hudEl.style.opacity = r; stageEl.classList.toggle('veiled', r <= 0);
     titleEl.style.opacity = title; titleEl.classList.toggle('gone', title <= 0);
-    const c = 1 - seg(p, 0, 0.05); cueEl.style.opacity = c; cueEl.hidden = c <= 0;
-    const s = 1 - seg(p, 0.86, 0.94); skipEl.style.opacity = s; skipEl.hidden = s <= 0;
+    boxButton();
     /* a pool of light on the floor under the standing boxes, until the table's own light comes up */
     const sp = scene.project(IB.spotAt[0], IB.spotAt[1], 0); spotEl.style.left = sp[0] + 'px'; spotEl.style.top = sp[1] + 'px'; spotEl.style.opacity = 1 - lights; spotEl.hidden = lights >= 1;
   }
   /* scroll progress through the track, 0 at the top, 1 at the bottom. The last pixel and a half count as the bottom: a browser at a zoom level
      or a fractional viewport height can stop a fraction of a pixel short of the track's end, and the game must still start there. */
-  const scrollProgress = () => { const range = trackEl.offsetHeight - stageEl.offsetHeight; if (!(range > 0)) return 1; const p = -trackEl.getBoundingClientRect().top / range; return p >= 1 - 1.5 / range ? 1 : clamp01(p) + 0; };   /* + 0: never -0 at the top */
-  /* what the console says (owner, 2026-09-18: "play still isn't starting when i hit the bottom of the page. add console debug as needed"): the
-     first frame, the plan, the start of the game, and, while the reader sits at the bottom with no game running, one status line every two
-     seconds with everything the start depends on. window.__debug() returns the same. */
+  /* the box button: "Open the box" while the boxes stand closed or the box is closing, "Close the box" while it opens or the game runs;
+     hidden while a harness drives p (#intro=, __intro.set) */
+  function boxButton() {
+    const opening = INTRO.live && INTRO.dir > 0, closed = INTRO.live && INTRO.p <= 0 && INTRO.dir <= 0;
+    const text = (INTRO.open || opening) ? 'Close the box' : 'Open the box', hidden = INTRO.forced !== null || INTRO.shot || (!INTRO.live && !INTRO.open);
+    if (boxBtn.textContent !== text) boxBtn.textContent = text;
+    if (boxBtn.hidden !== hidden) boxBtn.hidden = hidden;
+    if (boxBtn.classList.contains('closed') !== closed) boxBtn.classList.toggle('closed', closed);
+  }
+  function openBox() { if (INTRO.pending) return; if (!INTRO.live) return; INTRO.dir = 1; INTRO.last = performance.now(); dbg('open the box'); boxButton(); dirty = true; }
+  function closeBox() {
+    if (INTRO.pending) return;
+    if (!INTRO.live) { if (!INTRO.open) return; dbg('close the box: the pieces go back to the table pose and the opening is rebuilt from it'); returnToTable(); return; }
+    INTRO.dir = -1; INTRO.last = performance.now(); dbg('close the box'); boxButton(); dirty = true;
+  }
+  boxBtn.addEventListener('click', () => { if (INTRO.open || (INTRO.live && INTRO.dir > 0)) closeBox(); else openBox(); });
+  /* what the console says (owner, 2026-09-18: "add console debug as needed"): the first frame, the plan, the button, the start of the game and
+     uncaught errors; window.__debug() returns the state the start depends on */
   const T0 = performance.now();
   const dbg = (...a) => console.log(`[page ${((performance.now() - T0) / 1000).toFixed(1)}s]`, ...a);
-  window.__debug = () => { const range = trackEl.offsetHeight - stageEl.offsetHeight; return { scrollY: window.scrollY, innerHeight, scrollHeight: document.documentElement.scrollHeight, trackTop: +trackEl.getBoundingClientRect().top.toFixed(2), range, progress: +scrollProgress().toFixed(4), p: INTRO.p, forced: INTRO.forced, live: INTRO.live, pending: INTRO.pending, planning: !!INTRO.planner, fromTable: INTRO.fromTable, modal: modalOpen(), mode, demo: demo.on, paused, turn: G && G.turn, over: G && G.over, hash: location.hash }; };
+  window.__debug = () => ({ p: INTRO.p, dir: INTRO.dir, open: INTRO.open, forced: INTRO.forced, live: INTRO.live, pending: INTRO.pending, planning: !!INTRO.planner, fromTable: INTRO.fromTable, modal: modalOpen(), mode, demo: demo.on, paused, turn: G && G.turn, over: G && G.over, hash: location.hash, viewport: [innerWidth, innerHeight] });
   window.addEventListener('error', e => dbg('uncaught error:', e.message, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : ''));
   window.addEventListener('unhandledrejection', e => dbg('unhandled rejection:', e.reason && e.reason.message || e.reason));
-  let dbgLast = 0;
-  function dbgBottom(now) {
-    if (now - dbgLast < 2000) return;
-    const d = window.__debug(); if (d.scrollY + d.innerHeight < d.scrollHeight - 8 || d.demo) return;
-    dbgLast = now; dbg('at the bottom, no game running:', JSON.stringify(d));
-  }
   function introInit(now) {
     INTRO.pending = false; INTRO.p = -1;
     const q = Object.fromEntries(hashPairs());
-    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }   /* a harness scene: the scroll stays at the top and never packs the game */
+    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }   /* a harness scene: the hash decides what runs, the box never opens or closes */
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) { introFinish(); startDemo(); return; }
     if (q.intro !== undefined) INTRO.forced = clamp01(+q.intro);
-    introBuild(); INTRO.live = true; scene.dynamic = T.dynamic.concat(INTRO.boxB); scene.opts.fog = FOG; stageEl.classList.add('live');
-    if (INTRO.resumeFrom >= 0) { INTRO.p = INTRO.resumeFrom; INTRO.resumeFrom = -1; introApply(INTRO.p); }
-    if (!INTRO.armed) { INTRO.armed = true; window.addEventListener('scroll', () => { if (INTRO.live) dirty = true; }, { passive: true });
-      skipEl.addEventListener('click', () => window.scrollTo({ top: window.scrollY + trackEl.getBoundingClientRect().top + trackEl.offsetHeight - stageEl.offsetHeight, behavior: 'smooth' })); }
-    introUpdate(now === undefined ? performance.now() : now);
+    introBuild(); INTRO.live = true; INTRO.open = false; INTRO.dir = 0; scene.dynamic = T.dynamic.concat(INTRO.boxB); scene.opts.fog = FOG; stageEl.classList.add('live');
+    if (INTRO.resumeFrom >= 0) { INTRO.p = INTRO.resumeFrom; INTRO.resumeFrom = -1; INTRO.dir = -1; introApply(INTRO.p); }   /* back from the game: the box closes from the table */
+    else if (INTRO.p < 0) { INTRO.p = 0; introApply(0); }
+    INTRO.last = now === undefined ? performance.now() : now;
+    introUpdate(INTRO.last);
   }
-  /* the scroll position, followed with a short lag so wheel steps read as motion rather than jumps; a forced value (#intro=, __intro.set) is exact.
-     At the bottom the opening ends and the game starts. */
+  /* p runs with time in the button's direction; a forced value (#intro=, __intro.set) is exact. While the flight plan is still being made the
+     opening waits at the edge of the flights (or, closing from the game, at the edge of the table). At p = 1 the opening ends and the game
+     starts; at p = 0 the boxes stand closed again. */
   function introUpdate(now) {
-    let target = INTRO.forced === null ? scrollProgress() : INTRO.forced;
-    if (INTRO.planner) { const lim = INTRO.fromTable ? 0.99 : W0 - 0.002, held = INTRO.fromTable ? target < lim : target > lim; if (held) target = lim; waiting(held); }
-    let p = target;
-    if (INTRO.p >= 0 && INTRO.forced === null) { const k = 1 - Math.exp(-Math.max(0, Math.min(100, now - INTRO.last)) / 90); p = clamp01(INTRO.p + (target - INTRO.p) * k); if (Math.abs(target - p) < 3e-4) p = target; }
-    INTRO.last = now;
+    const dt = Math.max(0, Math.min(100, now - INTRO.last)); INTRO.last = now;
+    let p = INTRO.forced === null ? clamp01(INTRO.p + INTRO.dir * dt * INTRO.rate / (INTRO.dir > 0 ? OPEN_MS : CLOSE_MS)) : INTRO.forced;
+    if (INTRO.planner) { const lim = INTRO.fromTable ? 0.99 : W0 - 0.002, held = INTRO.fromTable ? p < lim : p > lim; if (held) p = lim; waiting(held); }
     if (p !== INTRO.p) { INTRO.p = p; introApply(p); dirty = true; }
-    if (p >= 1 && target >= 1 && INTRO.forced === null) { dbg(`bottom reached (p ${p}, target ${target}): the opening ends${modalOpen() ? ', a modal is open so the game waits' : ' and the game starts'}`); introFinish(); if (!modalOpen()) startDemo(); }
-    else dbgBottom(now);
+    if (INTRO.forced !== null) return;
+    if (p >= 1 && INTRO.dir > 0) { dbg(`the box is open: the opening ends${modalOpen() ? ', a modal is open so the game waits' : ' and the game starts'}`); introFinish(); if (!modalOpen()) startDemo(); }
+    else if (p <= 0 && INTRO.dir < 0) { INTRO.dir = 0; dbg('the box is closed'); boxButton(); }
   }
   /** the table as the table view keeps it: every instance back in its table pose, the second box gone, the opening over until the geometry changes */
   function introFinish() {
     if (INTRO.live) { for (const q of INTRO.all) restore(q); for (const q of INTRO.pieces) { q.inst.alpha = undefined; q.inst.shadow = q.shadow0; } INTRO.boxB = []; scene.dynamic = T.dynamic; scene.setView(framed(T.home)); }
-    INTRO.live = false; INTRO.forced = null; INTRO.planner = null; INTRO.end = INTRO.end === null ? 1 : INTRO.end; waiting(false); scene.opts.tableAlpha = 1; scene.opts.table = TABLE;
-    stageEl.classList.remove('live', 'veiled'); hudEl.style.opacity = ''; cueEl.hidden = true; skipEl.hidden = true; spotEl.hidden = true; titleEl.classList.add('gone'); dirty = true;
+    INTRO.live = false; INTRO.open = true; INTRO.dir = 0; INTRO.forced = null; INTRO.planner = null; INTRO.end = INTRO.end === null ? 1 : INTRO.end; waiting(false); scene.opts.tableAlpha = 1; scene.opts.table = TABLE;
+    stageEl.classList.remove('live', 'veiled'); hudEl.style.opacity = ''; spotEl.hidden = true; titleEl.classList.add('gone'); boxButton(); dirty = true;
   }
-  /* the reader scrolled up from the game: stop it, carry every piece back to the unstarted table over a moment, then hand the stage to the
-     opening at the bottom, from where it follows the scrollbar back up */
-  /* the reader scrolled up from the game: it stops where it is, every piece takes the place the engine gives it, and the opening is rebuilt
-     from that table, so scrolling up packs this very game into the box and scrolling down unpacks it and lets it go on */
+  /* the reader closes the box on the game: it stops where it is, every piece takes the place the engine gives it, and the opening is rebuilt
+     from that table, so closing packs this very game into the box and opening it again lets the game go on */
   function returnToTable() {
-    dbg(`scrolled up from the game (progress ${scrollProgress().toFixed(3)}): the pieces go back to the table and the opening is rebuilt`);
     stopDemo(); if (G && !G.over) { syncToEngine(); demo.resume = true; } else { demo.resume = false; logEl.innerHTML = ''; }
     for (const inst of T.static.concat(T.dynamic)) inst.group = undefined;
     INTRO.resumeFrom = 1; INTRO.pending = true;
   }
-  window.__intro = { get p() { return INTRO.p; }, get target() { return INTRO.forced === null ? scrollProgress() : INTRO.forced; }, get live() { return INTRO.live; }, get end() { return INTRO.end; }, get ready() { return !INTRO.planner && !INTRO.pending; }, get pileOrder() { return INTRO.pileOrder; }, get box() { return { o: BOXO, yE: INTRO.yE, cam: INTRO.cam }; }, get pieces() { return INTRO.pieces.map(q => ({ pid: q.inst.part.pid, id: q.inst.id, t0: q.t0, tL: q.tL, H: q.H, lift: q.lift, delay: q.delay, pile: q.slot.pile, z: q.slot.z, above: q.dbgAbove, under: q.dbgUnder, bS: q.bS.map(v => +v.toFixed(1)), nPts: q.ptsS.length })); }, set: p => { INTRO.forced = clamp01(+p); dirty = true; }, finish: introFinish };
+  window.__intro = { get p() { return INTRO.p; }, get dir() { return INTRO.dir; }, get open() { return INTRO.open; }, get rate() { return INTRO.rate; }, set rate(r) { INTRO.rate = +r; }, openBox, closeBox, get live() { return INTRO.live; }, get end() { return INTRO.end; }, get ready() { return !INTRO.planner && !INTRO.pending; }, get pileOrder() { return INTRO.pileOrder; }, get box() { return { o: BOXO, yE: INTRO.yE, cam: INTRO.cam }; }, get pieces() { return INTRO.pieces.map(q => ({ pid: q.inst.part.pid, id: q.inst.id, t0: q.t0, tL: q.tL, H: q.H, lift: q.lift, delay: q.delay, pile: q.slot.pile, z: q.slot.z, above: q.dbgAbove, under: q.dbgUnder, bS: q.bS.map(v => +v.toFixed(1)), nPts: q.ptsS.length })); }, set: p => { INTRO.forced = clamp01(+p); dirty = true; }, finish: introFinish };
 
   /* ------------------------------------------------------------ go */
-  /* a reload starts at the top, with the boxes closed, not wherever the browser remembers */
-  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
   G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); GT.resetShown(G); window.__maxSnap = 0;
   setMode('table');
   scene.onTextures = () => { dirty = true; };
@@ -985,9 +996,7 @@
   function loop(now) {
     if (INTRO.pending) introInit(now);
     else if (INTRO.live) introUpdate(now); else if (INTRO.shot) { /* a #shot= scene: the hash decides what runs */ }
-    else if (demo.on && mode === 'table' && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();
-    else if (!demo.on && mode === 'table' && !modalOpen() && scrollProgress() >= 1) { dbg('at the bottom with the table shown and no game running: the game starts'); startDemo(); }   /* the opening ended under a modal, or ended without the game for any other reason */
-    else if (!demo.on) dbgBottom(now);
+    else if (!demo.on && INTRO.open && mode === 'table' && !modalOpen()) { dbg('the box is open, the table is shown and no game is running: the game starts'); startDemo(); }   /* the opening ended under a modal, or ended without the game for any other reason */
     if (dirty) { dirty = false; scene.render(); if (firstFrame) { firstFrame = false; loadingEl.hidden = true; dbg('first frame drawn'); }
       if (!signalled && !INTRO.planner && !INTRO.pending) { signalled = true; if (window.__signalReady) window.__signalReady(); } }
     advancePlan();

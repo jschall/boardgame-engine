@@ -1,19 +1,19 @@
-/* A paper leaf has a front and a back. Turning it reveals the next spread. */
+/* A paper leaf has a front and a back. Turning it reveals the next spread. A click or a swipe turns the page; nothing else is on the
+   reader (owner, 2026-09-18: "get rid of the controls and text on the rulebook modal. it should just be click or swipe to turn the page").
+   A turning leaf bends: it is drawn as STRIPS hinged one on the next, the outer strips leading, so the page curls as a hand would lift it,
+   each strip shaded by the way it faces, and it throws a soft shadow on the table under it instead of the flat leaf's own drop shadow. */
 (function () {
   'use strict';
   const byId = id => document.getElementById(id);
   const book = byId('book'), reader = byId('manual-reader'), stage = byId('manual-stage');
-  const prev = byId('manual-prev'), next = byId('manual-next'), jump = byId('manual-page');
   const pages = [...book.children], count = window.__manualPageCount, expected = window.__manualPagesExpected;
   if (expected === 0) { window.__manual = { page: 0, turning: false, progress: 0, single: false, bootstrap: true }; return; }   /* a bootstrap build: no book yet */
   if (!Number.isInteger(expected) || expected < 4 || expected % 4) throw Error('game.json manual.pages must be a multiple of four, at least four');
   if (count !== expected || pages.length !== count) throw Error(`The complete ${expected}-page manual is required (the book has ${count})`);
-  pages.forEach((p, i) => {
-    p.setAttribute('aria-label', `Page ${i + 1}`);
-    jump.add(new Option(String(i + 1), String(i + 1)));
-  });
+  pages.forEach((p, i) => p.setAttribute('aria-label', `Page ${i + 1}`));
   let leaves = [], single = false, cursor = 0, motion = null, pointer = null, frame = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const STRIPS = 7, LEAF_MM = 180, BEND = 42;   /* the bend across the leaf at the middle of a turn, degrees */
   const last = () => single ? count - 1 : count / 2;
   const pageNumber = () => single ? cursor + 1 : Math.max(1, cursor * 2);
   function paint() {
@@ -21,7 +21,6 @@
       leaf.style.transform = `rotateY(${i < cursor ? -180 : 0}deg)`;
       leaf.style.zIndex = String(i < cursor ? i + 1 : leaves.length - i);
       leaf.style.visibility = (i === cursor || (!single && i === cursor - 1)) ? 'visible' : 'hidden';
-      leaf.classList.remove('turning');
     });
     pages.forEach((p, i) => {
       const visible = single ? i === cursor : i === cursor * 2 - 1 || i === cursor * 2;
@@ -29,21 +28,18 @@
       p.inert = !visible;
       p.setAttribute('aria-hidden', String(!visible));
     });
-    const n = pageNumber(), end = single ? n : Math.min(count, cursor * 2 + 1);
-    byId('manual-indicator').textContent = `${n === end ? n : n + '–' + end} / ${count}`;
-    jump.value = String(n);
-    prev.disabled = cursor === 0;
-    next.disabled = cursor === last();
     reader.classList.remove('dragging');
     book.style.setProperty('--book-shift', single ? '0px' : `${(cursor === 0 ? -1 : cursor === last() ? 1 : 0) * stage.clientWidth / 4}px`);
   }
   function fit() {
     const scale = Math.min(1, (stage.clientWidth - 16) / book.offsetWidth);
     book.style.setProperty('--book-scale', scale);
-    stage.style.height = `${book.offsetHeight * scale + 104}px`;
+    stage.style.height = `${book.offsetHeight * scale + 64}px`;
   }
-  function layout(target = pageNumber()) {
+  const pageAt = c => single ? c + 1 : Math.max(1, c * 2);
+  function layout(target = motion ? pageAt(motion.to) : pageNumber()) {   /* a relayout during a turn keeps the turn's destination */
     cancelAnimationFrame(frame);
+    if (motion) motion.curl.remove();
     motion = pointer = null;
     single = stage.clientWidth < 820;
     book.classList.toggle('single', single);
@@ -61,33 +57,66 @@
     cursor = single ? target - 1 : Math.floor(target / 2);
     fit(); paint();
   }
+  /* the bent leaf: STRIPS strips, each hinged on the left edge of the one before, each carrying its slice of the front page and, turned over,
+     its slice of the back page, plus the shadow the whole leaf throws on the table */
+  function buildCurl(leaf) {
+    const w = LEAF_MM / STRIPS, front = leaf.children[0], back = leaf.children[1];
+    const clone = (el, dx) => { const c = el.cloneNode(true); c.classList.add('manual-clone'); c.setAttribute('aria-hidden', 'true'); c.inert = true; c.style.left = `${dx}mm`; c.style.visibility = 'visible'; return c; };
+    const curl = document.createElement('div'); curl.className = 'manual-curl';
+    const ground = document.createElement('div'); ground.className = 'manual-ground'; curl.append(ground);
+    const strips = []; let parent = curl;
+    for (let k = 0; k < STRIPS; k++) {
+      const strip = document.createElement('div'); strip.className = 'manual-strip'; strip.style.width = `${w}mm`; strip.style.left = k ? `${w}mm` : '0';
+      const ff = document.createElement('div'); ff.className = 'manual-face'; ff.append(clone(front, -k * w));
+      const fb = document.createElement('div'); fb.className = 'manual-face manual-face-back'; fb.append(clone(back, -(STRIPS - 1 - k) * w));
+      strip.append(ff, fb); parent.append(strip); strips.push({ strip, ff, fb }); parent = strip;
+    }
+    return { curl, ground, strips, w };
+  }
+  function pose(value) {
+    const m = motion, v = m.direction > 0 ? value : 1 - value, theta = -180 * v;   /* the whole leaf's turn, 0 flat on the right, -180 flat on the left */
+    const n = STRIPS - 1, room = Math.min(-theta, 180 + theta) * 2 / n;             /* neither the spine strip nor the tip may dip below the table */
+    const c = Math.min(BEND / n * Math.sin(Math.PI * v), room), base = theta + n * c / 2;
+    let x = 0;
+    m.strips.forEach((s, k) => {
+      const a = k ? -c : base, abs = base - k * c, rad = abs * Math.PI / 180;
+      s.strip.style.transform = `rotateY(${a.toFixed(3)}deg)`;
+      s.ff.style.setProperty('--shade', (0.55 * (1 - Math.cos(rad)) / 2).toFixed(3));
+      s.fb.style.setProperty('--shade', (0.55 * (1 + Math.cos(rad)) / 2).toFixed(3));
+      x += m.w * Math.cos(rad);
+    });
+    const g = m.ground, lift = Math.sin(-theta * Math.PI / 180);
+    g.style.left = `${Math.min(0, x).toFixed(2)}mm`; g.style.width = `${Math.max(6, Math.abs(x)).toFixed(2)}mm`;
+    g.style.opacity = (0.42 * Math.pow(lift, 0.7)).toFixed(3);
+    g.classList.toggle('left', x < 0);
+  }
   function progress(value) {
     if (!motion) return;
-    motion.progress = value;
-    motion.leaf.style.transform = `rotateY(${-180 * (motion.direction > 0 ? value : 1 - value)}deg)`;
-    motion.leaf.style.setProperty('--turn-shade', Math.sin(value * Math.PI).toFixed(3));
+    motion.progress = value; pose(value);
   }
   function begin(direction) {
     if (motion || cursor + direction < 0 || cursor + direction > last()) return false;
     const i = direction > 0 ? cursor : cursor - 1, leaf = leaves[i];
-    motion = { leaf, direction, progress:0 };
+    motion = Object.assign({ leaf, direction, progress:0, to: cursor + direction }, buildCurl(leaf));
     book.style.setProperty('--book-shift', '0px');
     for (const j of [cursor - 2, cursor - 1, cursor, cursor + 1]) if (leaves[j]) leaves[j].style.visibility = 'visible';
-    leaf.style.visibility = 'visible'; leaf.style.zIndex = String(count + 1); leaf.classList.add('turning');
+    leaf.style.visibility = 'hidden';
+    motion.curl.style.zIndex = String(count + 2); book.append(motion.curl);
     progress(0);
     return true;
   }
   function settle(commit = true, destination = null) {
     if (!motion) return;
     const start = performance.now(), from = motion.progress, to = commit ? 1 : 0;
-    const duration = reduced.matches ? 0 : Math.max(180, 780 * Math.abs(to - from));
+    motion.to = commit ? (destination === null ? cursor + motion.direction : destination) : cursor;
+    const duration = reduced.matches ? 0 : Math.max(220, 900 * Math.abs(to - from));
     const tick = now => {
       const t = duration ? Math.min(1, (now - start) / duration) : 1;
       progress(from + (to - from) * (1 - Math.pow(1 - t, 3)));
       if (t < 1) frame = requestAnimationFrame(tick);
       else {
         if (commit) cursor = destination === null ? cursor + motion.direction : destination;
-        motion = null; paint();
+        motion.curl.remove(); motion.leaf.style.visibility = ''; motion = null; paint();
       }
     };
     frame = requestAnimationFrame(tick);
@@ -97,9 +126,6 @@
     const target = single ? n - 1 : Math.floor(n / 2);
     if (target !== cursor && begin(target > cursor ? 1 : -1)) settle(true, target);
   }
-  prev.addEventListener('click', () => turn(-1));
-  next.addEventListener('click', () => turn(1));
-  jump.addEventListener('change', () => go(+jump.value));
   reader.addEventListener('keydown', e => {
     if (e.target.matches('select,input,textarea') || e.altKey || e.ctrlKey || e.metaKey) return;
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
@@ -112,12 +138,14 @@
     const a = e.target.closest('a[href^="#p"]');
     if (a) { e.preventDefault(); go(+a.getAttribute('href').slice(2)); }
   });
+  /* a press on a page: a swipe drags the leaf, a click (no movement) turns it, the right page forward and the left page back;
+     in the single-page view the right half of the page turns forward and the left half back */
   stage.addEventListener('pointerdown', e => {
     if (motion || !e.isPrimary || e.button !== 0 || e.target.closest('a')) return;
-    const sheet = e.target.closest('.sheet');
+    const sheet = e.target.closest('.sheet, .manual-verso');
     if (!sheet || sheet.inert) return;
     const r = sheet.getBoundingClientRect();
-    pointer = { id:e.pointerId, x:e.clientX, y:e.clientY, width:r.width, fraction:(e.clientX - r.left) / r.width, page:+sheet.id.slice(1) };
+    pointer = { id:e.pointerId, x:e.clientX, y:e.clientY, width:r.width, fraction:(e.clientX - r.left) / r.width, page:sheet.id ? +sheet.id.slice(1) : 0 };
     reader.focus({ preventScroll:true });
   });
   stage.addEventListener('pointermove', e => {
@@ -137,9 +165,7 @@
     if (!pointer || pointer.id !== e.pointerId) return;
     const p = pointer; pointer = null;
     if (motion) settle(!cancel && motion.progress > .15);
-    else if (!cancel && Math.abs(e.clientX - p.x) < 7 && Math.abs(e.clientY - p.y) < 7 && (p.fraction < .18 || p.fraction > .82)) {
-      turn(single ? (p.fraction < .18 ? -1 : 1) : (p.page % 2 ? 1 : -1));
-    }
+    else if (!cancel && Math.abs(e.clientX - p.x) < 7 && Math.abs(e.clientY - p.y) < 7) turn(single ? (p.fraction < .5 ? -1 : 1) : (p.page % 2 ? 1 : -1));
     if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
   }
   stage.addEventListener('pointerup', e => release(e));
@@ -150,5 +176,5 @@
   }).observe(stage);
   layout(1);
   /* ### SCAFFOLD: observable state for the page gate and animation inspection. */
-  window.__manual = { get page() { return pageNumber(); }, get single() { return single; }, get turning() { return !!motion; }, get progress() { return motion ? motion.progress : 0; }, get count() { return count; } };
+  window.__manual = { get page() { return pageNumber(); }, get single() { return single; }, get turning() { return !!motion; }, get progress() { return motion ? motion.progress : 0; }, get count() { return count; }, get strips() { return motion ? motion.strips.length : 0; }, go, turn };
 })();

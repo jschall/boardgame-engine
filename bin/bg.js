@@ -22,7 +22,10 @@ const fs = require('fs'), path = require('path'), { spawnSync } = require('child
 const ENGINE = path.join(__dirname, '..');
 const argv = process.argv.slice(2), cmd = argv.shift();
 const GAME_DIR = process.cwd();
-const node = (script, args, opts) => { const r = spawnSync(process.execPath, [script].concat(args || []), Object.assign({ stdio: 'inherit', cwd: GAME_DIR, env: Object.assign({}, process.env, { GAME_DIR }) }, opts || {})); if (r.status !== 0) { console.error(`bg: ${path.relative(GAME_DIR, script)} ${(args || []).join(' ')} failed (exit ${r.status})`); process.exit(r.status || 1); } };
+/* every script runs with the engine's node_modules on NODE_PATH, so a game's own scripts (manual/assets.js, its checks) require sharp, pdf-lib and
+   playwright from the engine without an install of their own; opts.env extends this one */
+const ENV = Object.assign({}, process.env, { GAME_DIR, NODE_PATH: [path.join(ENGINE, 'node_modules')].concat(process.env.NODE_PATH ? [process.env.NODE_PATH] : []).join(path.delimiter) });
+const node = (script, args, opts) => { const o = Object.assign({ stdio: 'inherit', cwd: GAME_DIR }, opts || {}); o.env = Object.assign({}, ENV, opts && opts.env || {}); const r = spawnSync(process.execPath, [script].concat(args || []), o); if (r.status !== 0) { console.error(`bg: ${path.relative(GAME_DIR, script)} ${(args || []).join(' ')} failed (exit ${r.status})`); process.exit(r.status || 1); } };
 const cfg = () => { const f = path.join(GAME_DIR, 'game.json'); if (!fs.existsSync(f)) { console.error(`bg: no game.json in ${GAME_DIR}: run from the game folder (node engine/bin/bg.js new <folder> makes one)`); process.exit(2); } return JSON.parse(fs.readFileSync(f, 'utf8')); };
 const has = f => fs.existsSync(path.join(GAME_DIR, f));
 
@@ -59,7 +62,7 @@ const commands = {
       for (const f of fs.readdirSync(GAME_DIR).filter(f => /\.js$/.test(f) && !fs.existsSync(path.join(dir, f)))) fs.copyFileSync(path.join(GAME_DIR, f), path.join(dir, f));
       fs.symlinkSync(fs.realpathSync(path.join(GAME_DIR, 'engine')), path.join(dir, 'engine'));
       console.log(`fitcheck at ${h} (${dir})`);
-      node(path.join(ENGINE, 'checks', 'fitcheck.js'), [path.join(dir, 'parts', 'parts.json'), path.join(ENGINE, 'checks', 'scenes.js')], { env: Object.assign({}, process.env, { GAME_DIR: dir }) });
+      node(path.join(ENGINE, 'checks', 'fitcheck.js'), [path.join(dir, 'parts', 'parts.json'), path.join(ENGINE, 'checks', 'scenes.js')], { env: { GAME_DIR: dir } });
     }
   },
   check() {

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-/* Does anything pass through anything else while the box is unpacked? Freezes the opening at many scroll positions (the #intro= hook, on the
+/* Does anything pass through anything else while the box is unpacked? Freezes the opening at many values of its progress p (the #intro= hook, on the
    machine's GPU) and runs the same interior-sampling intersection test qa_intersections.js uses on the live scene at each one: every instance
    the page draws, in the pose the page draws it (groups, tilts, flights). Prints the intersecting pairs per position and exits 1 if any.
-     node engine/checks/opening_check.js [<slug>.html] [p0] [p1] [step]      (defaults 0.44 0.96 0.005; from the game folder) */
+     node engine/checks/opening_check.js [<slug>.html] [p0] [p1] [step]      (defaults 0.38 0.96 0.005, the pieces' part of the opening; from the game folder) */
 'use strict';
 const { chromium } = require('./browser.js');
 const path = require('path'); const { pathToFileURL } = require('url'); const fs = require('fs');
 const file = path.resolve(process.argv[2] || (() => { const C = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'game.json'), 'utf8')); return `${C.slug}.html`; })());
-const P0 = +(process.argv[3] || 0.44), P1 = +(process.argv[4] || 0.96), STEP = +(process.argv[5] || 0.005);
+const P0 = +(process.argv[3] || 0.38), P1 = +(process.argv[4] || 0.96), STEP = +(process.argv[5] || 0.005);
 /* the in-page test, lifted from the skill's qa_intersections.js: rasterise each part's interior, sample it in 3D, test against every neighbour's solid */
 const CHECK = fs.readFileSync(path.join(__dirname, 'qa_intersections.js'), 'utf8').match(/const CHECK = `([\s\S]*?)`;\n/)[1];
 (async () => {

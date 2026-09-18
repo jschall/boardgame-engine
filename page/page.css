@@ -2,8 +2,8 @@
 :root { --ink:#2a2014; --soft:#6d5a42; --cream:#fdf7e8; --paper:#f5ead0; --honey:#e3a72f; --honey-d:#9b6a12; --leaf:#4f6b36; --sky:#27405e; --line:#e1cda4; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--cream); color:var(--ink); font:17px/1.6 Georgia, "Times New Roman", serif; }
-/* the page is one scroll-driven stage: no scrollbar (the wheel, the keys and touch still scroll it) */
-html { scrollbar-width:none; } html::-webkit-scrollbar { display:none; }
+/* the page is one stage that fills the viewport: nothing scrolls (the wheel zooms the view once the box is open) */
+html, body { height:100%; overflow:hidden; }
 
 h2 { font-size:32px; margin:0 0 10px; } h2 small { font-size:15px; color:var(--soft); font-weight:normal; margin-left:8px; }
 h3 { font-size:21px; margin:24px 0 6px; }
@@ -60,13 +60,12 @@ body.lb-open { overflow:hidden; }
 @media(max-width:900px) { .test-sheet-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:420px) { .test-sheet-grid { gap:8px; } .test-card h4 { font-size:17px; } .test-card img { height:115px; } }
 
-/* the stage: one full-viewport 3D view that is the whole page. It sticks while the opening plays (scroll opens the box); at the bottom of the
-   track the game plays on it, with the score line and the log as transparent text over the view and the rulebook, the parts and the files behind
-   the nav's modals */
+/* the stage: one full-viewport 3D view that is the whole page. The box button opens the box (the opening plays) and closes it; the game plays
+   on the open table, with the score line and the log as transparent text over the view and the rulebook, the parts and the files behind the
+   nav's modals */
 #demo { width:100%; margin:0; }
-#demo .track { position:relative; height:560vh; }
-#demo .stage { position:sticky; top:0; height:100vh; height:100dvh; overflow:hidden; background:#120c07; }
-#c3d { width:100%; height:100%; display:block; touch-action:pan-y pinch-zoom; }   /* a finger always scrolls the page; a sideways drag orbits */
+#demo .stage { position:relative; height:100vh; height:100dvh; overflow:hidden; background:#120c07; }
+#c3d { width:100%; height:100%; display:block; touch-action:none; }   /* a finger orbits, two fingers zoom */
 .spot { position:absolute; width:min(72vw, 1100px); height:34vh; transform:translate(-50%, -50%); pointer-events:none; background:radial-gradient(ellipse at center, rgba(150,102,52,.40), rgba(150,102,52,.12) 42%, transparent 74%); }
 .spot[hidden] { display:none; }
 /* the loading screen: over the stage from the first byte until the first frame, and again, see-through, if the reader scrolls into the flights before their plan is ready */
@@ -83,12 +82,11 @@ body.lb-open { overflow:hidden; }
 .title p { margin:16px auto 0; max-width:960px; padding:0 20px; font:italic 20px/1.4 Georgia, serif; color:#ead9b2; text-shadow:0 1px 8px #000a; }
 .title .meta { font:15px/1.4 Georgia, serif; color:#cbb58e; letter-spacing:.06em; margin-top:10px; }
 .title.gone { visibility:hidden; }
-.cue { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); color:#e9d7ae; font:13px/1 Georgia, serif; letter-spacing:.16em; text-transform:uppercase; text-align:center; pointer-events:none; white-space:nowrap; }
-.cue i { display:block; width:13px; height:13px; margin:12px auto 0; border-right:2px solid #e9d7ae; border-bottom:2px solid #e9d7ae; transform:rotate(45deg); animation:cue 1.6s ease-in-out infinite; }
-@keyframes cue { 0%, 100% { transform:translateY(0) rotate(45deg); opacity:.45; } 50% { transform:translateY(8px) rotate(45deg); opacity:1; } }
-.cue[hidden] { display:none; }
-.skip { position:absolute; left:22px; bottom:24px; font:14px Georgia, serif; color:#e9d7ae; background:#00000055; border:1px solid #e9d7ae55; border-radius:99px; padding:7px 15px; cursor:pointer; }
-.skip:hover { border-color:#e9d7ae; }
+.boxbtn { position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:5; font:15px/1 Georgia, serif; letter-spacing:.12em; text-transform:uppercase; color:#e9d7ae; background:#00000066; border:1px solid #e9d7ae77; border-radius:99px; padding:12px 22px; cursor:pointer; transition:border-color .2s, background .2s; }
+.boxbtn:hover { border-color:#e9d7ae; background:#00000099; }
+.boxbtn.closed { animation:beckon 2.2s ease-in-out infinite; }
+@keyframes beckon { 0%, 100% { box-shadow:0 0 0 0 #e9d7ae00; } 50% { box-shadow:0 0 0 6px #e9d7ae22; } }
+.boxbtn[hidden] { display:none; }
 .nav { position:absolute; right:18px; top:16px; display:flex; gap:6px; z-index:5; }
 .nav button, .panel-bar button, .modal .close { font:14px Georgia, serif; letter-spacing:.06em; color:#f0e2c2; background:#1a1208a0; border:1px solid #ffffff22; border-radius:99px; padding:7px 15px; cursor:pointer; backdrop-filter:blur(10px); }
 .nav button:hover, .panel-bar button:hover, .modal .close:hover { border-color:#ffffff77; color:#fff; }
@@ -113,6 +111,7 @@ body.lb-open { overflow:hidden; }
 .modal[hidden] { display:none; }
 .modal-box { position:relative; max-width:1000px; margin:0 auto; background:var(--cream); color:var(--ink); border-radius:18px; padding:26px 30px 34px; box-shadow:0 30px 80px #000a; }
 .modal-box.wide { max-width:1240px; }
+.modal-box.book-box { padding:44px 18px 18px; }
 .modal .close { position:absolute; right:16px; top:14px; font-size:20px; line-height:1; padding:4px 12px; background:#2a2014; }
 .modal h2 { margin-right:60px; }
 body.modal-open { overflow:hidden; }
@@ -124,7 +123,7 @@ body.modal-open { overflow:hidden; }
   .orbit-help { display:none; }
   .nav { right:8px; top:8px; gap:4px; } .nav button { padding:6px 10px; font-size:13px; }
   .title { top:9vh; } .title p { font-size:16px; } .title .meta { font-size:12px; }
-  .cue { bottom:18px; } .cue span { display:none; } .skip { left:12px; bottom:16px; font-size:13px; }
+  .boxbtn { bottom:16px; font-size:13px; padding:10px 16px; }
   .modal { padding:8px; } .modal-box { padding:18px 12px 24px; border-radius:12px; }
 }
-@media (prefers-reduced-motion:reduce) { #demo .track { height:auto; } #demo .stage { position:relative; } .cue i { animation:none; } .loading .cells i { animation:none; opacity:.8; } }
+@media (prefers-reduced-motion:reduce) { .boxbtn.closed { animation:none; } .loading .cells i { animation:none; opacity:.8; } }

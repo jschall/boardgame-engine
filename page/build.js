@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* build.js (boardgame-engine): builds the game's single self-contained page: the stage (the scroll-driven opening, the self-playing table, the parts
+/* build.js (boardgame-engine): builds the game's single self-contained page: the stage (the opening the box button runs, the self-playing table, the parts
    viewer), the rulebook modal (the print manual embedded as a book) and the laser-files modal (every sheet, downloadable, and the stock inputs
    that regenerate them in a worker).
    Run from the game folder:  node engine/bin/bg.js page [--out FILE] [--no-geom] [--no-manual]
@@ -117,43 +117,33 @@ module.exports = function build(GAME_DIR, argv) {
     return { sources, fonts: Object.fromEntries(FONT_FILES.map(f => [f, fs.readFileSync(path.join(ENGINE, 'fonts', f)).toString('base64')])) };
   }
 
-  /* the page body: the stage, the nav, the rulebook and files modals */
+  /* the page body: the stage with its one button (the box opens and closes on it; nothing scrolls), the nav, the rulebook modal (the book alone)
+     and the files modal (which also carries the rulebook's PDF links) */
   const BODY = String.raw`
 <section id="demo">
-    <div class="track" id="track">
       <div class="stage cwrap" id="stage">
         <canvas id="c3d"></canvas>
         <div class="loading" id="loading"><div class="cells"><i></i><i></i><i></i></div><span>Loading</span></div>
         <div class="spot" id="spot"></div>
         <div class="vignette"></div>
         <div class="title" id="intro-title"><h1>@@TITLE@@</h1><p>@@TAGLINE@@</p><p class="meta">@@META_LINE@@</p></div>
-        <div class="cue" id="cue"><span>Scroll to open the box</span><i></i></div>
-        <button type="button" class="skip" id="btn-skip">Skip the opening</button>
+        <button type="button" class="boxbtn" id="btn-box">Open the box</button>
         <nav class="nav" id="nav"><button type="button" data-open="rules">Rulebook</button><button type="button" data-open="parts">Parts</button><button type="button" data-open="files">Laser files</button></nav>
         <div class="hud" id="hud">
           <div class="chips" id="chips"></div>
           <div class="log" id="log"></div>
-          <p class="orbit-help">drag to orbit · right-drag to pan · ctrl + scroll to zoom · scroll up to close the box</p>
+          <p class="orbit-help">drag to orbit · right-drag to pan · scroll to zoom</p>
         </div>
         <aside class="panel" id="panel" hidden>
           <div class="panel-bar"><b>Every part, as cut</b><button type="button" id="pv-explode">Explode</button><button type="button" class="close" data-close="parts" aria-label="Close">×</button></div>
           <div class="pvdesc" id="pv-desc"></div><div class="plist" id="plist"></div>
         </aside>
       </div>
-    </div>
 </section>
-<div class="modal" id="modal-rules" hidden><div class="modal-box">
+<div class="modal" id="modal-rules" hidden><div class="modal-box book-box">
     <button type="button" class="close" data-close="rules" aria-label="Close">×</button>
     <section id="rules">
-      <h2>The rulebook</h2>@@RULEBOOK_RULES@@
-      <div class="manual-reader" id="manual-reader" role="region" aria-label="Interactive rulebook" tabindex="0" aria-describedby="manual-help">
-        <div class="manual-toolbar">
-          <button type="button" id="manual-prev" aria-label="Previous page">← Previous</button>
-          <label class="manual-jump">Page <select id="manual-page" aria-label="Go to page"></select></label>
-          <span id="manual-indicator" role="status" aria-live="polite"></span>
-          <button type="button" id="manual-next" aria-label="Next page">Next →</button>
-        </div>
-        <p id="manual-help">Turn a corner or drag a page. Use ← and → keys to browse.</p>
+      <div class="manual-reader" id="manual-reader" role="region" aria-label="The rulebook. Click or swipe a page to turn it; the arrow keys turn pages too." tabindex="0">
         <div id="manual-stage"><div id="book"></div></div>
       </div>
     </section>
@@ -162,6 +152,7 @@ module.exports = function build(GAME_DIR, argv) {
     <button type="button" class="close" data-close="files" aria-label="Close">×</button>
     <section id="files">
       <h2>Laser files <small id="files-legend">300 × 450 mm sheets · kerf drawn into every cut: machine kerf compensation OFF · black engrave, yellow vector fill, blue score, orange corner marks, red cut</small></h2>
+      @@RULEBOOK_RULES@@
       @@STOCK@@
       <p id="sheet-status" role="status" hidden></p>
       <div class="sheets" id="sheets">@@SHEET_GROUPS@@</div>

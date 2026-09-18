@@ -1,14 +1,7 @@
 /* These rules only present the generated paper pages; typography lives in the manual. */
-.manual-reader { border-radius:16px; background:#e6d7b9; padding:18px 16px 28px; outline-offset:5px; }
-.manual-toolbar { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; }
-.manual-toolbar button, .manual-toolbar select { font:600 16px/1.2 Fredoka, sans-serif; color:var(--ink); background:#fffaf0; border:1px solid #a58a59; border-radius:8px; padding:10px 14px; cursor:pointer; }
-.manual-toolbar button:disabled { opacity:.4; cursor:default; }
-.manual-toolbar button:focus-visible, .manual-toolbar select:focus-visible { outline:3px solid var(--honey-d); outline-offset:3px; }
-.manual-jump { display:flex; align-items:center; gap:6px; }
-#manual-indicator { min-width:100px; text-align:center; font-size:15px; }
-#manual-help { text-align:center; color:#63513d; font-size:14px; margin:12px 0 16px; }
+.manual-reader { border-radius:16px; background:#e6d7b9; padding:10px 16px 14px; outline-offset:5px; }
 #manual-stage { position:relative; width:100%; overflow:hidden; touch-action:pan-y pinch-zoom; }
-#book { position:absolute; left:50%; top:48px; width:360mm; height:180mm; margin:0; background:transparent; perspective:5000px; transform-origin:top center; transform:translateX(calc(-50% + var(--book-shift, 0px))) scale(var(--book-scale, 1)); transition:transform .65s ease; isolation:isolate; }
+#book { position:absolute; left:50%; top:28px; width:360mm; height:180mm; margin:0; background:transparent; perspective:5000px; transform-origin:top center; transform:translateX(calc(-50% + var(--book-shift, 0px))) scale(var(--book-scale, 1)); transition:transform .65s ease; isolation:isolate; }
 #book.single { width:180mm; }
 #book .manual-leaf { position:absolute; width:180mm; height:180mm; top:0; left:180mm; transform-origin:left center; transform-style:preserve-3d; }
 #book.single .manual-leaf { left:0; }
@@ -18,15 +11,22 @@
 #book .bleed { inset:0; }
 #book .sheet::after, #book .manual-verso::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
 #book .manual-back::after { background:linear-gradient(270deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
-#book .manual-leaf.turning::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,#3a260844,transparent 35%); opacity:var(--turn-shade, 0); pointer-events:none; transform:translateZ(.2px); }
+/* the turning leaf: strips hinged one on the next (the nesting composes their turns), each showing its slice of the front and, turned over, of
+   the back; a strip's shade follows the way it faces; the leaf's own drop shadow is off while it is in the air and a soft shadow lies on the
+   table under it instead */
+#book .manual-curl { position:absolute; top:0; left:180mm; width:180mm; height:180mm; transform-style:preserve-3d; pointer-events:none; }
+#book.single .manual-curl { left:0; }
+#book .manual-strip { position:absolute; top:0; height:180mm; transform-origin:0 50%; transform-style:preserve-3d; will-change:transform; }
+#book .manual-face { position:absolute; inset:0; overflow:hidden; backface-visibility:hidden; background:var(--paper); }
+#book .manual-face-back { transform:rotateY(180deg); }
+#book .manual-face .manual-clone { position:absolute; top:0; width:180mm; height:180mm; box-shadow:none; transform:none; border-radius:0; backface-visibility:visible; }
+#book .manual-face .manual-clone::after { display:none; }
+#book .manual-face::after { content:''; position:absolute; inset:0; pointer-events:none; background:#2a1a08; opacity:var(--shade, 0); }
+#book .manual-ground { position:absolute; top:0; height:180mm; transform:translateZ(-0.4px); pointer-events:none; opacity:0; background:linear-gradient(90deg,#3a2608cc,#3a260855 70%,#3a260800); filter:blur(7px); }
+#book .manual-ground.left { background:linear-gradient(270deg,#3a2608cc,#3a260855 70%,#3a260800); }
 #book a:focus-visible { outline:2px solid var(--honey); outline-offset:2px; }
 #book img { -webkit-user-drag:none; }
 .manual-reader.dragging { user-select:none; cursor:grabbing; }
-@media (max-width:600px) {
-  .manual-reader { padding:14px 6px; margin:0 -12px; }
-  .manual-toolbar { gap:8px; }
-  .manual-toolbar button, .manual-toolbar select { font-size:14px; padding:9px; }
-  #manual-indicator { min-width:76px; font-size:13px; }
-  #manual-help { font-size:13px; }
-}
+#book .sheet { cursor:pointer; }
+@media (max-width:600px) { .manual-reader { padding:8px 6px; margin:0 -12px; } }
 @media (prefers-reduced-motion:reduce) { #book { transition:none; } }

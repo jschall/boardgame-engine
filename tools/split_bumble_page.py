@@ -39,7 +39,7 @@ legend = rep(legend, "  const escH = s => String(s).replace(/&/g, '&amp;').repla
 legend = rep(legend, "(node geom/cli.js)`);", "`);")
 legend = rep(legend, "    const KF = need(META, 'kerfs', 'META'), kerf = KF.t3 === KF.tw && KF.t3 === KF.t15 ? `${n(KF.t3)} mm` : `${n(KF.t3)} mm (basswood 3 mm), ${n(KF.tw)} mm (walnut) and ${n(KF.t15)} mm (basswood 1.5 mm)`;",
              "    const KF = need(META, 'kerfs', 'META'), kv = STOCK_LIST.map(k => need(KF, k, 'META.kerfs')), kerf = kv.every(v => v === kv[0]) ? `${n(kv[0])} mm` : STOCK_LIST.map(k => `${n(KF[k])} mm (${STOCKS[k].name})`).join(', ');")
-stock = block("  /* ------------------------------------------------------------ stock thickness", "  /* ------------------------------------------------------------ the opening: scrolling opens the box")
+stock = block("  /* ------------------------------------------------------------ stock thickness", "  /* ------------------------------------------------------------ the opening: one button opens the box")
 stock = rep(stock, "  /* each stock's thinnest and thickest caliper reading and its kerf: slots and bars are drawn for the thickest, tab depths for the thinnest (geom/fits.js) */\n  const STOCK_KEYS = ['t3lo', 't3hi', 'twlo', 'twhi', 't15lo', 't15hi', 'kerf3', 'kerfw', 'kerf15'];\n  const STOCK_RANGE = { t3lo: [0.5, 10], t3hi: [0.5, 10], twlo: [0.5, 10], twhi: [0.5, 10], t15lo: [0.3, 6], t15hi: [0.3, 6], kerf3: [0.001, 0.6], kerfw: [0.001, 0.6], kerf15: [0.001, 0.6] };",
              "  /* each stock's thinnest and thickest caliper reading and its kerf: slots and bars are drawn for the thickest, tab depths for the thinnest. META.stocks[k].params names the three hash keys */\n  const PARAMS = STOCK_LIST.map(k => need(STOCKS[k], 'params', 'META.stocks.' + k));\n  const STOCK_KEYS = PARAMS.flatMap(p => [need(p, 'lo', 'params'), need(p, 'hi', 'params'), need(p, 'kerf', 'params')]);\n  const STOCK_RANGE = Object.fromEntries(PARAMS.flatMap(p => [[p.lo, [0.3, 10]], [p.hi, [0.3, 10]], [p.kerf, [0.001, 0.6]]]));")
 stock = rep(stock, "        BumbleGeom.common.register_fonts(m.fonts);", "        GameGeom.register_fonts(m.fonts);")
@@ -51,18 +51,13 @@ stock = rep(stock, "      const G = BumbleGeom.parts, t0 = performance.now();\n 
              "      const GG = GameGeom, t0 = performance.now();\n      GG.onprogress = function (f, label) { self.postMessage({ type: 'progress', id: m.id, f: f, label: label }); };\n      try {\n        const P = lasergeom.parse_hash(m.hash, GG.defaults), r = lasergeom.build(GG, P);")
 stock = rep(stock, "    w.postMessage({ type: 'fonts', fonts: FREDOKA, cache: ENG_CACHE, parts: PARTS });", "    w.postMessage({ type: 'fonts', fonts: FONTS, cache: ENG_CACHE, parts: PARTS });")
 stock = rep(stock, "      return ['t3', 'tw', 't15'].every(s => P[s + 'lo'] <= P[s + 'hi']) ? P : null;", "      return PARAMS.every(p => P[p.lo] <= P[p.hi]) ? P : null;")
-opening = block("  /* ------------------------------------------------------------ the opening: scrolling opens the box", "  /* ------------------------------------------------------------ go */")
+opening = block("  /* ------------------------------------------------------------ the opening: one button opens the box", "  /* ------------------------------------------------------------ go */")
 opening = rep(opening, "pile: pid === 'meadow-frame' ? 'frame' : Math.round(q.x / 2) + '|' + Math.round(q.y / 2),", "pile: need(q, 'pile', 'packing.json placements'),")
-# #shot= is a still or a QA run at scroll 0: the loop must not hand the demo back to the opening (BUMBLE's page had this regression on
-# 2026-09-18 and fixed it the same way at 29bb04a; the replacements only apply to a page.js from before)
-if "INTRO.shot" not in opening:
-    opening = rep(opening, "    if (q.shot !== undefined) { introFinish(); return; }", "    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }")
-    opening = rep(opening, "  const INTRO = { pending: true, live: false, armed: false,", "  const INTRO = { pending: true, live: false, shot: false, armed: false,")
+assert "INTRO.shot" in opening, "the page.js is from before 29bb04a (no INTRO.shot): re-split from a09dbdd or later"
+assert "boxBtn" in opening, "the page.js is from before a15e8ec (no box button): re-split from a09dbdd or later"
 opening = opening.replace("`[bumble ${((performance.now() - T0) / 1000).toFixed(1)}s]`", "`[page ${((performance.now() - T0) / 1000).toFixed(1)}s]`")
 go = '\n'.join(lines[find("  /* ------------------------------------------------------------ go */"):])
 go = rep(go, "  G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); resetShown(); window.__maxSnap = 0;", "  G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); GT.resetShown(G); window.__maxSnap = 0;")
-if "INTRO.shot" not in go:
-    go = rep(go, "else if (demo.on && mode === 'table' && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();", "else if (demo.on && mode === 'table' && !INTRO.shot && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();")
 # startDemo / stopDemo / demoLoop are the machinery template's; BUMBLE's own startDemo line (with its console line) replaces the template's when it differs
 sd = lines[find("  function startDemo() {")]
 

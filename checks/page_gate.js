@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/* page_gate.js (boardgame-engine): the live page gate: structure, the real manual embedded, offline assets, the opening (scroll-driven, reversible,
-   sticky), the reader's flow (auto-start at the bottom, pack and resume), the rulebook modal, phones, the parts panel, the files modal with a stock
+/* page_gate.js (boardgame-engine): the live page gate: structure, the real manual embedded, offline assets, the opening (the box button runs it
+   forward and back, the hooks freeze it), the reader's flow (the game starts by itself when the box is open, closing packs the live game, opening
+   resumes it), the rulebook modal (the book alone, a click or a swipe turns a bending page), phones, the parts panel, the files modal with a stock
    regeneration, no console errors. node engine/bin/bg.js check runs it. Game facts come from game.json (manual pages, players).
      node engine/checks/page_gate.js <slug>.html     (from the game folder; BG_GPU=1 uses the machine's GPU) */
 'use strict';
@@ -47,82 +48,88 @@ async function main() {
     pg.on('pageerror', e => errors.push(String(e)));
     pg.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     pg.on('request', r => { if (!r.url().startsWith('data:') && !r.url().startsWith('blob:') && r.url() !== pathToFileURL(file).href) external.push(r.url()); });
-    const ready = () => pg.waitForFunction(() => window.__manual && window.__qa && window.__intro && (window.__intro.live || window.__intro.p >= 0 || window.__qa().playing), null, { timeout:300000 });
+    /* ready: the page's own signal (the first frame, and the flight plan when there is an opening; the plan is made between frames) */
+    const ready = () => pg.waitForFunction(() => window.__manual && window.__qa && window.__intro && window.__intro.ready && (window.__intro.live || window.__intro.p >= 0 || window.__qa().playing), null, { timeout:300000 });
     const frame = () => pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const shot = (sel, name) => pg.locator(sel).screenshot({ path:path.join(shots, name), animations:'disabled', timeout:120000 });
     await pg.goto(pathToFileURL(file).href, { timeout:300000 });
     await ready(); await pg.evaluate(() => document.fonts.ready);
-    /* the page: one stage that is the whole scroll, then the two modals; nothing else */
+    /* the page: one stage that is the whole viewport, then the two modals; nothing else */
     assert.deepEqual(await pg.locator('body > section, body > main, body > header, body > .modal').evaluateAll(es => es.map(e => e.id || e.tagName)), ['demo', 'modal-rules', 'modal-files']);
     assert.deepEqual(await pg.locator('#modal-rules > .modal-box > section, #modal-files > .modal-box > section').evaluateAll(es => es.map(e => e.id)), ['rules', 'files']);
-    for (const sel of ['#btn-play', '#btn-new', '#speed', '#btn-view', '.tabs', '[data-mode]', '.pill', 'header.hero', '#below', '#manual-zoom', '#btn-lift']) assert.equal(await pg.locator(sel).count(), 0, 'no ' + sel);
+    for (const sel of ['#btn-play', '#btn-new', '#speed', '#btn-view', '.tabs', '[data-mode]', '.pill', 'header.hero', '#below', '#manual-zoom', '#btn-lift', '#track', '#cue', '#btn-skip', '.manual-toolbar', '#manual-help', '#manual-prev', '#manual-next', '#manual-page', '#rules > h2', '#rules > p', '#rules > .rulebook-top']) assert.equal(await pg.locator(sel).count(), 0, 'no ' + sel);
     assert.deepEqual(await pg.locator('#nav button').evaluateAll(es => es.map(e => [e.dataset.open, e.textContent])), [['rules', 'Rulebook'], ['parts', 'Parts'], ['files', 'Laser files']]);
-    assert.equal(await pg.locator('#stage > canvas#c3d, #stage > .cue, #stage > #btn-skip, #stage > #intro-title h1, #stage > #nav, #stage > .hud > #chips, #stage > .hud > #log, #stage > #panel[hidden]').count(), 8, 'the stage: canvas, cue, skip, title, nav, chips and log in the HUD, the parts panel closed');
+    assert.equal(await pg.locator('#stage > canvas#c3d, #stage > #btn-box, #stage > #intro-title h1, #stage > #nav, #stage > .hud > #chips, #stage > .hud > #log, #stage > #panel[hidden], #stage > #loading').count(), 8, 'the stage: canvas, the box button, title, nav, chips and log in the HUD, the parts panel closed, the loading screen');
     assert.deepEqual(await pg.locator('#log').evaluate(e => [getComputedStyle(e).overflowY, getComputedStyle(e).pointerEvents]), ['hidden', 'none'], 'the log neither scrolls under the wheel nor takes the pointer');
-    assert.equal(await pg.locator('a[href*="manual/output"]').count(), 2, 'the two PDF links, once each, in the rulebook modal');
+    assert.equal(await pg.locator('#modal-files a[href*="manual/output"]').count(), 2, 'the two PDF links, once each, in the files modal (the rulebook modal is the book alone)');
     const GP = require(path.join(root, 'page.js'))(CFG, JSON.parse(fs.readFileSync(path.join(root, 'parts/parts.json'))));
     const expected = GP.SHEET_GROUPS.flatMap(g => g.sheets.flatMap(s => [s.id].concat(s.back ? [s.back] : []))).sort();
     assert.deepEqual(await pg.locator('#sheets .sheet').evaluateAll(es => es.map(e => e.dataset.sheetId).sort()), expected);
-    assert(await pg.locator('#sheets .sheet').evaluateAll(es => es.every(e => { const a = e.querySelector('a[download]'); return a && a.download.endsWith('.svg') && a.href.startsWith('blob:'); })), 'every sheet card downloads its SVG (a blob URL)');
+    assert(await pg.locator('#sheets .sheet').evaluateAll(es => es.every(e => { const a = e.querySelector('a[download]'); return a && a.download.endsWith('.svg') && a.href.startsWith('blob:'); })), 'every sheet card downloads a blob made from its plain-text SVG block');
+    assert.equal(await pg.locator('script.sheet-svg').count(), expected.length, 'one plain-text SVG block per sheet, after page.js');
+    assert(await pg.locator('#loading').evaluate(e => e.hidden), 'the loading screen is gone once the first frame is drawn');
     assert.equal(await pg.locator('#stock input').count(), 3 * Object.keys(JSON.parse(fs.readFileSync(path.join(root, 'parts/parts.json'))).meta.stocks).length);
     assert.equal(await pg.locator('#sheet-status').count(), 1);
     for (const a of await pg.locator('.rulebook-top a').all()) assert(fs.existsSync(path.resolve(path.dirname(file), await a.getAttribute('href'))));
-    assert.equal(await pg.evaluate(() => getComputedStyle(document.documentElement).scrollbarWidth), 'none', 'no scrollbar');
-    pass(`One stage, two modals, three nav buttons, no controls, ${expected.length} sheet downloads, stock and PDF links`);
-    /* the opening: scroll-driven, reversible, sticky, skipped for #shot= and reduced motion, handed back to the table by the hooks */
+    assert(await pg.evaluate(() => document.documentElement.scrollHeight <= innerHeight && getComputedStyle(document.documentElement).overflow === 'hidden'), 'nothing scrolls: the stage is the page');
+    pass(`One stage, two modals, three nav buttons, no controls but the box button, ${expected.length} sheet downloads, stock and PDF links`);
+    /* the opening: the box button runs it forward and back, the hooks freeze it, #shot= and reduced motion skip it, the table pose hook ends it */
     const poses = () => pg.evaluate(() => window.__scene.static.concat(window.__scene.dynamic).map(i => [i.part && i.part.pid, i.x, i.y, i.z, i.hidden, i.alpha, JSON.stringify(i.group)]));
-    await frame(); assert.deepEqual(await pg.evaluate(() => [window.__intro.live, window.__intro.p, scrollY]), [true, 0, 0], 'the page opens at the top with the boxes closed');
-    assert(await pg.evaluate(() => window.__intro.end < 0.985), 'the last piece lands before the bottom');
+    await frame(); assert.deepEqual(await pg.evaluate(() => [window.__intro.live, window.__intro.p, window.__intro.dir, window.__intro.open]), [true, 0, 0, false], 'the page opens with the boxes closed and still');
+    assert(await pg.evaluate(() => window.__intro.end < 0.985), 'the last piece lands before the end of the opening');
     assert.equal(await pg.evaluate(() => getComputedStyle(document.getElementById('hud')).visibility), 'hidden');
-    assert(await pg.locator('#cue').isVisible() && await pg.locator('#intro-title').isVisible() && await pg.locator('#nav').isVisible());
+    assert(await pg.locator('#btn-box').isVisible() && await pg.locator('#intro-title').isVisible() && await pg.locator('#nav').isVisible());
+    assert.equal(await pg.locator('#btn-box').textContent(), 'Open the box');
     const stage = await pg.locator('#stage').boundingBox(); assert.equal(Math.round(stage.height), 1000, 'the stage fills the viewport'); assert.equal(Math.round(stage.y), 0);
-    assert.equal(await pg.evaluate(() => getComputedStyle(document.getElementById('stage')).position), 'sticky', 'the stage is sticky (the renderer must not override it)');
     assert(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow');
     const at0 = await poses();
     await pg.evaluate(() => window.__intro.set(0.5)); await frame(); const at50 = await poses();
-    assert(at50.some((r, i) => r[1] !== at0[i][1] || r[2] !== at0[i][2] || r[3] !== at0[i][3]), 'scrolling moves the pieces');
+    assert(at50.some((r, i) => r[1] !== at0[i][1] || r[2] !== at0[i][2] || r[3] !== at0[i][3]), 'progress moves the pieces');
     assert.equal(await pg.evaluate(() => window.__scene.opts.tableAlpha), 1);
+    assert(!(await pg.locator('#btn-box').isVisible()), 'the button hides while a hook drives the opening');
     await pg.evaluate(() => window.__intro.set(0)); await frame(); assert.deepEqual(await poses(), at0, 'the opening runs backwards to the same frame');
     assert.equal(await pg.evaluate(() => window.__scene.opts.tableAlpha), 0, 'no table before the lights come up');
     await pg.evaluate(() => window.__intro.set(1)); await frame();
     assert.equal(await pg.evaluate(() => getComputedStyle(document.getElementById('hud')).visibility), 'visible');
-    assert(!(await pg.locator('#cue').isVisible()) && !(await pg.locator('#intro-title').isVisible()));
-    assert.equal(await pg.evaluate(() => window.__qa().playing), false, 'a frozen frame at the bottom does not start the game');
+    assert(!(await pg.locator('#intro-title').isVisible()));
+    assert.equal(await pg.evaluate(() => window.__qa().playing), false, 'a frozen frame at the end does not start the game');
     await shot('#stage', 'stage-unpacked.png');
-    const range = await pg.evaluate(() => { const t = document.getElementById('track'), s = document.getElementById('stage'); return [t.offsetHeight - s.offsetHeight, t.getBoundingClientRect().top + scrollY]; });
-    assert(range[0] > 2000, 'a long scroll track');
     const tablePose = await pg.evaluate(() => window.__placements.table().map(i => [i.part.pid, i.x, i.y, i.z, i.group === undefined]));
     assert(tablePose.every(r => r[4]) && !(await pg.evaluate(() => window.__intro.live)), 'asking for the table pose ends the opening and clears every group');
-    pass('The opening: scroll-driven and reversible, sticky, HUD veiled until the end, hooks see the table pose');
-    /* the reader's flow: the real scrollbar drives it; the game starts at the bottom by itself; scrolling up returns the pieces and re-arms it */
+    pass('The opening: driven by progress, reversible, HUD veiled until the end, the button hides under the hooks, hooks see the table pose');
+    /* the reader's flow: the box button opens the box, the game starts by itself, the same button closes the box on the game and opens it again */
     await pg.reload(); await ready(); await frame();
-    await pg.evaluate(y => window.scrollTo(0, y), range[1] + range[0] * 0.5);
-    await pg.waitForFunction(() => Math.abs(window.__intro.p - 0.5) < 0.005, null, { timeout:20000 });
-    assert.equal(await pg.evaluate(() => document.getElementById('stage').getBoundingClientRect().top), 0, 'the stage stays put while the track scrolls');
+    await pg.evaluate(() => { window.__intro.rate = 4; });   /* four times the pace, so the check takes seconds */
+    await pg.locator('#btn-box').click();
+    await pg.waitForFunction(() => window.__intro.dir > 0 && window.__intro.p > 0.45, null, { timeout:20000 });
+    assert.equal(await pg.locator('#btn-box').textContent(), 'Close the box');
+    assert.equal(await pg.evaluate(() => document.getElementById('stage').getBoundingClientRect().top), 0, 'the stage stays put');
     await shot('#stage', 'stage-opening.png');
-    await pg.evaluate(y => window.scrollTo(0, y), range[1] + range[0]);
-    await pg.waitForFunction(() => !window.__intro.live && window.__qa().playing, null, { timeout:20000 });
+    await pg.waitForFunction(() => !window.__intro.live && window.__qa().playing, null, { timeout:30000 });
+    assert.deepEqual(await pg.evaluate(() => { const v = window.__scene.opts; return [Math.round(v.view), Math.round(v.pitch)]; }), await pg.evaluate(() => { const K = window.__intro.box.cam, last = K[K.length - 1][1]; return [Math.round(last.view), Math.round(last.pitch)]; }), 'the game starts from the opening\'s last camera, no step');
     await pg.waitForFunction(() => document.querySelectorAll('#log .le').length > 2, null, { timeout:60000 });
     const logH = await pg.locator('#log').evaluate(e => e.getBoundingClientRect().height);
     await pg.waitForFunction(n => document.querySelectorAll('#log .le').length > n + 3, await pg.locator('#log .le').count(), { timeout:60000 });
     assert.equal(await pg.locator('#log').evaluate(e => e.getBoundingClientRect().height), logH, 'the log keeps its height as it fills');
     assert.equal(await pg.locator('#chips .chip').count(), NPLAY);
     await shot('#stage', 'stage-game.png');
-    await pg.evaluate(y => window.scrollTo(0, y), range[1] + range[0] * 0.7);
-    await pg.waitForFunction(() => window.__intro.live && !window.__qa().playing && Math.abs(window.__intro.p - 0.7) < 0.01, null, { timeout:20000 });
     const turnAtPack = await pg.evaluate(() => window.__qa().turn);
-    await pg.evaluate(y => window.scrollTo(0, y), range[1] + range[0]);
+    await pg.locator('#btn-box').click();   /* close the box on the game: the plan is rebuilt from the live table, then the box closes */
+    await pg.waitForFunction(() => window.__intro.live && !window.__qa().playing && window.__intro.dir < 0, null, { timeout:20000 });
+    await pg.waitForFunction(() => window.__intro.p < 0.7 && window.__intro.p > 0.1, null, { timeout:40000 });
+    assert.equal(await pg.locator('#btn-box').textContent(), 'Open the box');
+    await pg.locator('#btn-box').click();   /* open it again before it is closed: it turns round */
+    await pg.waitForFunction(() => window.__intro.dir > 0, null, { timeout:5000 });
     await pg.waitForFunction(() => window.__qa().playing, null, { timeout:60000 });
     await pg.waitForFunction(t => window.__qa().turn > t, turnAtPack, { timeout:90000 });
-    assert(await pg.locator('#log .le').filter({ hasText: 'The game goes on.' }).count() >= 1, 'scrolling up packs the live game; scrolling down unpacks it and it goes on');
-    await pg.evaluate(() => window.scrollTo(0, 0));
-    await pg.waitForFunction(() => window.__intro.live && window.__intro.p === 0, null, { timeout:20000 });
-    await pg.locator('#btn-skip').click(); await pg.waitForFunction(() => !window.__intro.live && window.__qa().playing, null, { timeout:20000 });
-    assert(!(await pg.locator('#btn-skip').isVisible()), 'Skip scrolls to the bottom and the game starts');
+    assert(await pg.locator('#log .le').filter({ hasText: 'The game goes on.' }).count() >= 1, 'closing the box packs the live game; opening it unpacks it and it goes on');
+    await pg.locator('#btn-box').click();
+    await pg.waitForFunction(() => window.__intro.live && window.__intro.p <= 0 && window.__intro.dir === 0, null, { timeout:60000 });
+    assert(await pg.locator('#intro-title').isVisible() && await pg.locator('#btn-box').evaluate(e => e.classList.contains('closed')), 'closed all the way: the title is back and the button beckons');
     await pg.emulateMedia({ reducedMotion:'reduce' }); await pg.reload(); await ready(); await frame();
-    assert.deepEqual(await pg.evaluate(() => [window.__intro.live, document.getElementById('track').offsetHeight === document.getElementById('stage').offsetHeight, getComputedStyle(document.getElementById('hud')).visibility, window.__qa().playing]), [false, true, 'visible', true], 'reduced motion: the assembled table, no scroll track, the game plays');
+    assert.deepEqual(await pg.evaluate(() => [window.__intro.live, document.getElementById('btn-box').hidden, getComputedStyle(document.getElementById('hud')).visibility, window.__qa().playing]), [false, false, 'visible', true], 'reduced motion: the assembled table, the game playing');
     await pg.emulateMedia({ reducedMotion:'no-preference' });
-    pass('The reader\'s flow: the scrollbar drives the opening, the game starts at the bottom, scrolling up packs the live game and down resumes it, Skip, reduced motion');
+    pass('The reader\'s flow: the button opens the box, the game starts by itself, closing packs the live game and opening resumes it, closing all the way, reduced motion');
     /* the rulebook modal: the real manual, page turning, keyboard, index links, phones */
     await pg.reload(); await ready(); await frame();
     await pg.locator('#nav [data-open="rules"]').click(); assert(await pg.locator('#modal-rules').isVisible());
@@ -149,22 +156,27 @@ async function main() {
     await shot('#modal-rules .modal-box', 'manual-cover.png');
     const idle = () => pg.waitForFunction(() => !window.__manual.turning);
     const pageIs = async n => { await idle(); assert.equal(await pg.evaluate(() => window.__manual.page), n); };
-    assert(await pg.locator('#manual-prev').isDisabled());
-    await pg.locator('#manual-next').click();
+    const clickPage = async (id, fx = .5) => { const r = await pg.locator(id).boundingBox(); await pg.mouse.click(r.x + r.width * fx, r.y + r.height * .5); };
+    await clickPage('#p1');   /* a click on the right page turns forward */
     await pg.waitForFunction(() => window.__manual.progress > .15 && window.__manual.progress < .95);
-    assert(await pg.locator('#book .turning').evaluate(e => getComputedStyle(e).transform.startsWith('matrix3d(')));
+    assert(await pg.evaluate(() => window.__manual.strips >= 5 && [...document.querySelectorAll('#book .manual-strip')].every(e => getComputedStyle(e).transform.startsWith('matrix3d('))), 'the turning leaf is drawn as hinged strips in 3D');
+    assert(await pg.locator('#book .manual-ground').evaluate(e => +getComputedStyle(e).opacity > 0), 'the turning leaf throws a shadow on the table');
     await pg.screenshot({ path:path.join(shots, 'manual-turn.png'), animations:'allow' });
     await pageIs(2);
+    assert.equal(await pg.locator('#book .manual-curl').count(), 0, 'the strips are gone once the leaf has landed');
     assert.equal(await pg.locator('#book .sheet[aria-hidden="false"]').count(), 2);
-    await pg.locator('#manual-reader').focus(); await pg.keyboard.press('ArrowRight'); await pageIs(4);
+    await clickPage('#p2'); await pageIs(1);   /* a click on the left page turns back */
+    await pg.locator('#manual-reader').focus(); await pg.keyboard.press('ArrowRight'); await pageIs(2);
+    await pg.keyboard.press('ArrowRight'); await pageIs(4);
     await pg.keyboard.press('ArrowLeft'); await pageIs(2);
     await pg.keyboard.press('Home'); await pageIs(1);
-    await pg.keyboard.press('End'); await pageIs(PAGES); assert(await pg.locator('#manual-next').isDisabled());
+    await pg.keyboard.press('End'); await pageIs(PAGES);
+    await clickPage(`#p${PAGES}`); await pageIs(PAGES - 2);   /* the last page lies on the left, so a click on it turns back */
     /* an index page, when the manual has one (a .index with links to pages): the first link leads to its page */
     const idx = await pg.evaluate(() => { const a = document.querySelector('#book .index a'); if (!a) return null; return { from: +a.closest('.sheet').id.slice(1), to: +a.querySelector('b').textContent }; });
-    if (idx) { await pg.locator('#manual-page').selectOption(String(idx.from)); await pageIs(idx.from); await pg.locator('#book .index a').first().click(); await pageIs(idx.to === 1 ? 1 : idx.to & ~1); }   /* a spread shows its even (left) page */
+    if (idx) { await pg.evaluate(n => window.__manual.go(n), idx.from); await pageIs(idx.from & ~1 || 1); await pg.locator('#book .index a').first().click(); await pageIs(idx.to === 1 ? 1 : idx.to & ~1); }   /* a spread shows its even (left) page */
     const mid = Math.max(2, Math.floor(PAGES / 2)) & ~1;   /* an even page: the left of a spread */
-    await pg.locator('#manual-page').selectOption(String(mid)); await pageIs(mid);
+    await pg.evaluate(n => window.__manual.go(n), mid); await pageIs(mid);
     await shot('#modal-rules .modal-box', 'manual-spread.png');
     const r = await pg.locator(`#p${mid + 1}`).boundingBox();
     await pg.mouse.move(r.x + r.width * .9, r.y + r.height * .6); await pg.mouse.down();
@@ -173,23 +185,25 @@ async function main() {
     await pg.screenshot({ path:path.join(shots, 'manual-drag.png'), animations:'allow' });
     await pg.mouse.up(); await pageIs(mid + 2);
     await pg.keyboard.press('Escape'); assert(!(await pg.locator('#modal-rules').isVisible()), 'Escape closes the modal');
-    pass('Rulebook modal: real 3D turn, drag, keyboard, page selector, index links, facing example, bounded first/last pages, Escape');
+    pass('Rulebook modal: the book alone; a click turns the page, the leaf bends and throws a shadow, drag, keyboard, index links, facing example, bounded first/last pages, Escape');
     await pg.setViewportSize({ width:390, height:844 });
     assert(await pg.evaluate(() => { const s = document.getElementById('stage').getBoundingClientRect(); return Math.round(s.height) === innerHeight && document.documentElement.scrollWidth <= innerWidth; }), 'mobile: the stage fills the viewport, no horizontal overflow');
     await pg.locator('#nav [data-open="rules"]').click();
-    await pg.waitForFunction(() => window.__manual.single); await idle();   /* the viewer relays out; a select during a turn is ignored */
-    await pg.locator('#manual-page').selectOption('1'); await pageIs(1);
+    await pg.waitForFunction(() => window.__manual.single); await idle();   /* the viewer relays out; a click during a turn is ignored */
+    await pg.evaluate(() => window.__manual.go(1)); await pageIs(1);
     assert.equal(await pg.locator('#book .sheet[aria-hidden="false"]').count(), 1);
     await shot('#modal-rules .modal-box', 'manual-mobile.png');
     const m = await pg.locator('#p1').boundingBox();
-    await pg.mouse.click(m.x + m.width * .93, m.y + m.height * .8); await pageIs(2);
-    await pg.locator('#manual-next').click(); await pageIs(3);
-    await pg.locator('#manual-prev').click(); await pageIs(2);
+    await pg.mouse.click(m.x + m.width * .8, m.y + m.height * .8); await pageIs(2);   /* the right half turns forward */
+    const m2 = await pg.locator('#p2').boundingBox();
+    await pg.mouse.click(m2.x + m2.width * .8, m2.y + m2.height * .5); await pageIs(3);
+    const m3 = await pg.locator('#p3').boundingBox();
+    await pg.mouse.click(m3.x + m3.width * .2, m3.y + m3.height * .5); await pageIs(2);   /* the left half turns back */
     await pg.emulateMedia({ reducedMotion:'reduce' });
-    await pg.locator('#manual-next').click(); await pageIs(3);
+    await pg.mouse.click(m2.x + m2.width * .8, m2.y + m2.height * .5); await pageIs(3);
     await pg.emulateMedia({ reducedMotion:'no-preference' });
     await pg.locator('#modal-rules .close').click(); assert(!(await pg.locator('#modal-rules').isVisible()));
-    pass('390 px: single pages, corner click, previous/next, reduced motion, full-viewport stage');
+    pass('390 px: single pages, a click on either half, reduced motion, full-viewport stage');
     /* the parts panel and the files modal */
     await pg.setViewportSize({ width:1400, height:1000 });
     await pg.locator('#nav [data-open="parts"]').click();
