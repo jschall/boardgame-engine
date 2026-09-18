@@ -117,9 +117,12 @@
   /** halve a silhouette H tall for a cross-lapped pair: from_top slots down to half height, else up from `below` past the base line; each slot runs `over` past the halving line */
   function crosslap(sil, H, from_top, width, over, below, name = 'a cross-lapped pair') {
     const slot = from_top ? sbox(-width / 2, -H - 5, width / 2, -H / 2 + over) : sbox(-width / 2, -H / 2 - over, width / 2, below);
-    /* the slot's run through the wood (from the silhouette's own edge on the centre line to the halving line, the tab not counted) is at least XLAP_MIN_SLOT */
-    const run = sil.intersection(sbox(-width / 2, from_top ? -H - 5 : -H / 2 - over, width / 2, from_top ? -H / 2 + over : 0)), b = run.is_empty ? [0, 0, 0, 0] : run.bounds, len = b[3] - b[1];
-    if (len < D.XLAP_MIN_SLOT - 1e-6) throw new Error(`${name}: its ${from_top ? 'top' : 'bottom'} slot runs ${len.toFixed(1)} mm through the wood; a cross-lap slot is ${D.XLAP_MIN_SLOT} mm at least (a taller silhouette, or more of it on the centre line)`);
+    /* the slot's run through the wood, measured along each of its two walls (0.2 mm outside the slot, where the wood that bears actually is: a spring slit
+       up the centre line does not count against it): from the silhouette's own edge to the halving line for the top slot, from the halving line down
+       through the tab for the bottom one (the slot is cut through the tab and bears on the other half's tab there). The shorter wall is at least XLAP_MIN_SLOT */
+    const y0 = from_top ? -H - 5 : -H / 2 - over, y1 = from_top ? -H / 2 + over : below + 5, wall = x => { const r = sil.intersection(sbox(x - 0.05, y0, x + 0.05, y1)); return r.is_empty ? 0 : r.bounds[3] - r.bounds[1]; };
+    const len = Math.min(wall(-width / 2 - 0.2), wall(width / 2 + 0.2));
+    if (len < D.XLAP_MIN_SLOT - 1e-6) throw new Error(`${name}: its ${from_top ? 'top' : 'bottom'} slot runs ${len.toFixed(1)} mm through the wood along its wall; a cross-lap slot is ${D.XLAP_MIN_SLOT} mm at least (a taller silhouette, or more of it beside the centre line)`);
     return sil.difference(slot);
   }
   /** the band an engraving keeps clear of a standing pair's centre line (the crossing half hides it) */
