@@ -2,7 +2,7 @@
 
 Everything the owner has said about how parts are actually made, generalised. The parts generator must follow these; if a rule changes, change it here and in the generator.
 
-## Machine and stock (defaults; confirm with the owner)
+## Machine and stock (the author's shop, as the worked example: every game asks for its own at the brief, standard K4)
 
 - xTool S1, 40 W diode laser. Bed 498 × 319 mm, no pass-through. Sheets: 12 × 18 in (305 × 457 mm) plywood, nominally 3 mm (1/8 in); also 1.5 mm. Basswood in both thicknesses, walnut in 3 mm only.
 - **Measure the stock.** The owner's nominal 3 mm ply measured 2.67–2.92 mm with calipers (2026-09-15): a 0.25 mm spread within one stock. Ask for caliper readings per stock at the brief (two per stock, the thinnest and thickest sheet: `t3lo`, `t3hi`), put them in `design.md`, and derive every dimension from them: slots and holes from the thickest reading, tab depths and anything that must reach through from the thinnest, so every sheet in the batch fits (every lasergeom fit takes `t`; the page regenerates from the thicknesses the buyer types), with a small clearance. Where parts from different sheets mate (a tab from one sheet in a slot of another), the spread is larger than any sensible clearance, so those joints need a compliant feature or a positive capture rather than a fixed slot width. Box joints may be glued. The owner's chosen answer is thickness-driven geometry generated in the page itself (see `page.md`), so a buyer types their caliper readings and downloads files cut for their sheets.

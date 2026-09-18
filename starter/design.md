@@ -4,6 +4,11 @@ The engine's starter: a complete small game that runs every part of the chain, s
 one file at a time. It is a demonstration of the machinery, not a finished design: its balance, art and rulebook are the floor a real game
 starts from.
 
+## The shop
+- Machine: xTool S1, 40 W diode, bed 498 x 319 mm, engraves; sheets 305 x 457 mm (12 x 18 in).
+- Stock: basswood 3 mm (caliper 2.67 to 2.92 mm), basswood 1.5 mm (1.35 to 1.65 mm); kerf drawn for 0.18 mm on both, to be corrected from sheet 0's coupons after the first cut.
+- Bought: nothing.
+
 ## Brief
 - 2 to 4 players, 20 to 30 minutes, adults and children from 8.
 - Theme: a shared orchard, four fruits, orders from the village, a crow that guards one tree.
