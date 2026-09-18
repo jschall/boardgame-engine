@@ -620,7 +620,7 @@
   function tweenRecord(inst, S) {
     const E = scene.basis(inst), bb = inst.part.bbox, c = [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2, inst.thick / 2];
     const PE = scene.world(E, c[0], c[1], c[2]), PS = scene.world(S, c[0], c[1], c[2]), R = relRot(E, S);
-    return { inst, E, S, end: { x: inst.x, y: inst.y, z: inst.z }, off: V3.sub(PE, [inst.x, inst.y, inst.z]), PE, PS, axis: R.axis, angle: R.angle, shadow0: inst.shadow };
+    return { inst, E, S, end: { x: inst.x, y: inst.y, z: inst.z }, off: V3.sub(PE, [inst.x, inst.y, inst.z]), PE, PS, axis: R.axis, angle: R.angle, shadow0: inst.shadow, thick: inst.thick, mates: [] };
   }
   /* pose the instance so its centre sits at P with the rotation angle a (degrees) still to go about the pivot (its centre unless given), then the whole-box tip on top */
   function poseAt(q, P, a, tipG, pivot, axis) {
@@ -676,9 +676,9 @@
      throws. */
   function* schedule(P) {
     const N = P.length, D = DIM(), TOP = D.NECK_TOP + 0.8;
-    const halfH = q => q.vertical ? 0.5 * (q.inst.part.bbox[3] - q.inst.part.bbox[1]) + 1.2 : q.inst.thick / 2 + 0.6;
+    const halfH = q => q.vertical ? 0.5 * (q.inst.part.bbox[3] - q.inst.part.bbox[1]) + 1.2 : q.thick - q.inst.thick / 2 + 0.6;   /* from the centre of the carrier to the top of what is glued on it */
     const G3 = geomOf();
-    for (const q of P) { const f = { part: q.inst.part, thick: q.inst.thick }; q.rz = halfH(q); q.rzS = q.inst.thick / 2 + 0.6;   /* rz: what it sweeps once it turns; rzS: its thickness while it lifts flat with its pile */ q.r = 0.5 * Math.hypot(q.inst.part.bbox[2] - q.inst.part.bbox[0], q.inst.part.bbox[3] - q.inst.part.bbox[1]) + 0.5; q.bS = G3.box(f, q.S); q.bE = G3.box(f, q.E); q.ptsS = G3.pts(f, q.S); q.ptsE = G3.pts(f, q.E); }
+    for (const q of P) { const f = { part: q.inst.part, thick: q.thick }; q.rz = halfH(q); q.rzS = q.thick - q.inst.thick / 2 + 0.6;   /* rz: what it sweeps once it turns; rzS: its thickness while it lifts flat with its pile */ q.r = 0.5 * Math.hypot(q.inst.part.bbox[2] - q.inst.part.bbox[0], q.inst.part.bbox[3] - q.inst.part.bbox[1]) + 0.5; q.bS = G3.box(f, q.S); q.bE = G3.box(f, q.E); q.ptsS = G3.pts(f, q.S); q.ptsE = G3.pts(f, q.E); }
     const over = G3.over;
     const foot = (a, b, inBox) => inBox ? G3.foot(a.ptsS, b.ptsS, a.inst, a.S, false, a.bS, b.inst, b.S, false, b.bS) : G3.foot(a.ptsE, b.ptsE, a.inst, a.E, !!a.vertical, a.bE, b.inst, b.E, !!b.vertical, b.bE);
     const above = P.map(() => []), under = P.map(() => []);   /* above[i]: packed above i; under[i]: i lands on them */
@@ -775,13 +775,26 @@
        whichever piles its pieces come from. The launch order itself empties the box pile by pile, top down: a pile with other piles stacked on
        it, or holding a kind of piece that lands on a kind held by another pile (bees on bases), goes after them. */
     const boxIds = new Set(BOXA.concat(LIDA).map(i => i.id));
-    const slots = PACKING.map(q => { const pid = q.pid, stock = need(need(META, 'part_stock', 'META'), pid, 'META.part_stock'), thick = STOCK_T(stock);
+    let slots = PACKING.map(q => { const pid = q.pid, stock = need(need(META, 'part_stock', 'META'), pid, 'META.part_stock'), thick = STOCK_T(stock);
       const S = scene.basis({ part: part(pid), x: BOXO[0] + q.x, y: BOXO[1] + q.y, z: floorTop + q.z, rot: q.rot || 0, thick });
       return { pid, stock, thick, S, x: BOXO[0] + q.x, y: BOXO[1] + q.y, z: floorTop + q.z, rot: q.rot || 0, pile: need(q, 'pile', 'packing.json placements'), sig: outlineSig({ part: part(pid), stock }) }; });
+    /* glued parts fly as one piece (owner, 2026-09-18: "trays are glued together - when they're coming out of the box they should come out as one
+       piece"): a laminated tray's pocket layer on its back (META.trays), and the pairs the game's table names in GT.glued ([carrier pid, mate pid]:
+       BUMBLE's comb frames on their backings). The mate lies on its carrier in the box and on the table; it leaves the planning, the carrier is
+       planned at their joint thickness, and the mate follows the carrier's flight at its fixed offset, turning with it. */
+    const GLUED = new Map();
+    for (const [tid, tr] of Object.entries(META.trays || {})) if (tr.frame && PARTS[tid + '-frame']) GLUED.set(tid + '-frame', tid);
+    for (const [c, m] of (GT.glued || [])) GLUED.set(m, c);
+    const onTop = (m, c, ct) => Math.abs(m.x - c.x) < 0.05 && Math.abs(m.y - c.y) < 0.05 && Math.abs(((((m.rot || 0) - (c.rot || 0)) % 360) + 360) % 360) < 0.01 && Math.abs(m.z - (c.z + ct)) < 0.35;
+    for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => o.pid === GLUED.get(sl.pid) && o.pile === sl.pile && onTop(sl, o, o.thick)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${GLUED.get(sl.pid)} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
+    slots = slots.filter(sl => !GLUED.has(sl.pid));
+    for (const sl of slots) sl.fat = sl.thick + (sl.mates || []).reduce((a, m) => a + m.thick, 0);
     const G3 = geomOf();
-    for (const sl of slots) { const f = { part: part(sl.pid), thick: sl.thick, vertical: false }; sl.b = G3.box(f, sl.S); sl.pts = G3.pts(f, sl.S); }
-    const insts = T.static.concat(T.dynamic).filter(inst => !boxIds.has(inst.id) && !inst.hidden);
-    for (const inst of insts) { inst._sig = outlineSig(inst); const E = scene.basis(inst); inst._E = E; inst._b = G3.box(inst, E); inst._pts = G3.pts(inst, E); }
+    for (const sl of slots) { const f = { part: part(sl.pid), thick: sl.fat, vertical: false }; sl.b = G3.box(f, sl.S); sl.pts = G3.pts(f, sl.S); }
+    let insts = T.static.concat(T.dynamic).filter(inst => !boxIds.has(inst.id) && !inst.hidden);
+    for (const m of insts) if (GLUED.has(m.part.pid)) { const c = insts.find(o => o.part.pid === GLUED.get(m.part.pid) && onTop(m, o, o.thick)); if (!c) throw new Error(`the opening: ${m.part.pid} is glued onto ${GLUED.get(m.part.pid)} but the table does not show it on one`); (c._mates = c._mates || []).push(m); }
+    insts = insts.filter(inst => !GLUED.has(inst.part.pid));
+    for (const inst of insts) { inst._sig = outlineSig(inst); const E = scene.basis(inst); inst._E = E; const f = { part: inst.part, thick: inst.thick + (inst._mates || []).reduce((a, m) => a + m.thick, 0), vertical: inst.vertical }; inst._fat = f.thick; inst._b = G3.box(f, E); inst._pts = G3.pts(f, E); }
     const bySig = new Map(); for (const sl of slots) { if (!bySig.has(sl.sig)) bySig.set(sl.sig, []); bySig.get(sl.sig).push(sl); }
     for (const [sig, group] of bySig) { const n = insts.filter(i => i._sig === sig).length; if (n !== group.length) throw new Error(`the opening: packing.json has ${group.length} slot(s) of ${group[0].pid}'s outline and the table shows ${n} piece(s) of it`); }
     /* piles stacked on piles (slot footprints), kinds landing on kinds (table footprints) */
@@ -841,9 +854,12 @@
     for (const [sig, group] of bySig) {
       const list = insts.filter(i => i._sig === sig).sort((a, b) => a._b[2] - b._b[2] || a.x - b.x || a.y - b.y), order = group.slice().sort((a, b) => a.seq - b.seq);
       list.forEach((inst, k) => { const sl = order[k]; const S = scene.basis({ part: inst.part, x: sl.x, y: sl.y, z: sl.z, rot: sl.rot, flipped: !!inst.flipped, thick: inst.thick });
-        const q = tweenRecord(inst, S); q.slot = sl; q.seq = sl.seq; q.band = sl.band; q.vertical = !!inst.vertical; pieces.push(q); });
+        const q = tweenRecord(inst, S); q.slot = sl; q.seq = sl.seq; q.band = sl.band; q.vertical = !!inst.vertical; q.thick = inst._fat;
+        /* a glued mate: its packed pose is the carrier's plus the offset it keeps on the table, so the pair is rigid in the box as on the table */
+        q.mates = (inst._mates || []).map(m => { const Sm = scene.basis({ part: m.part, x: sl.x, y: sl.y, z: sl.z + (m.z - inst.z), rot: sl.rot, flipped: !!m.flipped, thick: m.thick }); const mq = tweenRecord(m, Sm); mq.d = V3.sub(mq.PE, q.PE); return mq; });
+        pieces.push(q); });
     }
-    for (const inst of insts) { delete inst._sig; delete inst._E; delete inst._b; delete inst._pts; }
+    for (const inst of insts) { delete inst._sig; delete inst._E; delete inst._b; delete inst._pts; delete inst._fat; delete inst._mates; }
     /* the plan is made between frames (two or three seconds of work: the boxes are on screen meanwhile); until it is done every piece
        stays where the opening starts from, in the box or, coming back up from the game, on the table */
     IB.pieces = pieces; IB.end = null; IB.fromTable = INTRO.resumeFrom >= 0; IB.planner = schedule(pieces);
@@ -901,9 +917,10 @@
     }
     for (const q of IB.pieces) {
       const f = IB.planner ? (IB.fromTable ? 'landed' : null) : flight(q, p);
-      if (f === 'landed') { restore(q); if (tipG) q.inst.group = [tipG]; continue; }
-      if (f === null) { poseAt(q, q.PS, q.angle, tipG); q.inst.shadow = false; continue; }
+      if (f === 'landed') { restore(q); if (tipG) q.inst.group = [tipG]; for (const m of q.mates) { restore(m); if (tipG) m.inst.group = [tipG]; } continue; }
+      if (f === null) { poseAt(q, q.PS, q.angle, tipG); q.inst.shadow = false; for (const m of q.mates) { poseAt(m, V3.add(q.PS, m.d), q.angle, tipG, q.PS, q.axis); m.inst.shadow = false; } continue; }
       q.inst.shadow = q.shadow0; poseAt(q, f.P, f.a, tipG);
+      for (const m of q.mates) { m.inst.shadow = m.shadow0; poseAt(m, V3.add(f.P, m.d), f.a, tipG, f.P, q.axis); }   /* glued on: the same path and turn, at its offset */
     }
     for (const inst of IB.boxB) { inst.alpha = fadeB < 1 ? fadeB : undefined; inst.hidden = fadeB <= 0.01; }
     scene.setView(introCamera(p));
