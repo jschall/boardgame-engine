@@ -162,7 +162,7 @@ async function main() {
     await pg.keyboard.press('End'); await pageIs(PAGES); assert(await pg.locator('#manual-next').isDisabled());
     /* an index page, when the manual has one (a .index with links to pages): the first link leads to its page */
     const idx = await pg.evaluate(() => { const a = document.querySelector('#book .index a'); if (!a) return null; return { from: +a.closest('.sheet').id.slice(1), to: +a.querySelector('b').textContent }; });
-    if (idx) { await pg.locator('#manual-page').selectOption(String(idx.from)); await pageIs(idx.from); await pg.locator('#book .index a').first().click(); await pageIs(idx.to % 2 ? idx.to : idx.to); }
+    if (idx) { await pg.locator('#manual-page').selectOption(String(idx.from)); await pageIs(idx.from); await pg.locator('#book .index a').first().click(); await pageIs(idx.to === 1 ? 1 : idx.to & ~1); }   /* a spread shows its even (left) page */
     const mid = Math.max(2, Math.floor(PAGES / 2)) & ~1;   /* an even page: the left of a spread */
     await pg.locator('#manual-page').selectOption(String(mid)); await pageIs(mid);
     await shot('#modal-rules .modal-box', 'manual-spread.png');

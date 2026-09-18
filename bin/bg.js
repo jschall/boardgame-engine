@@ -4,7 +4,7 @@
      node engine/bin/bg.js doctor                        this machine can run the engine (node, the browser, poppler, rsvg)
      node engine/bin/bg.js parts ['#t3lo=2.67&t3hi=2.92&kerf_t3=0.18'] [--out DIR] [--jobs N] [--no-cache]
                                                          parts/parts.json, parts/<sheet>.svg, manifest.json, parts/engraving_cache.json (exit 1 on any check)
-     node engine/bin/bg.js stats [games]                 stats.json and showcase.json from self-play (the sim contract)
+     node engine/bin/bg.js stats [games]                 stats.json and showcase.json from self-play (the sim contract; a game with its own stats.js keeps it)
      node engine/bin/bg.js balance [balance.js options]  seat wins, rounds, goals against the targets; --tune key=lo:hi:step
      node engine/bin/bg.js pack                          packing.json and pack/layer-N.png: every piece in the closed box (FITS, or exit 1)
      node engine/bin/bg.js jig [--no-render]             jig.json and parts/jig-sheet.svg: the box glue jig (and the game's jigs.js) with its FEM gate
@@ -29,7 +29,7 @@ const has = f => fs.existsSync(path.join(GAME_DIR, f));
 const commands = {
   doctor() { node(path.join(ENGINE, 'bin', 'doctor.js'), argv); },
   parts() { cfg(); node(path.join(ENGINE, 'src', 'cli.js'), argv); },
-  stats() { const C = cfg(); node(path.join(ENGINE, 'checks', 'stats.js'), [C.sim].concat(argv)); },
+  stats() { const C = cfg(); node(has('stats.js') ? path.join(GAME_DIR, 'stats.js') : path.join(ENGINE, 'checks', 'stats.js'), (has('stats.js') ? [] : [C.sim]).concat(argv)); },   /* a game with its own showcase criteria keeps its stats.js */
   balance() { const C = cfg(); node(path.join(ENGINE, 'checks', 'balance.js'), [C.sim].concat(argv)); },
   pack() { cfg(); node(path.join(ENGINE, 'src', 'pack.js'), argv); },
   jig() { cfg(); node(path.join(ENGINE, 'src', 'jig.js'), argv); },
@@ -68,6 +68,7 @@ const commands = {
     const skip = Object.keys(JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'parts', 'parts.json'), 'utf8')).layout).filter(s => /^(kerf-|sheet0$|.*-coupons$)/.test(s));
     node(path.join(ENGINE, 'checks', 'qa_intersections.js'), [page, 'qa_scenes.json', '--parts', 'parts/parts.json'].concat(skip.length ? ['--skip-sheets', skip.join(',')] : [], has('qa_options.json') ? JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'qa_options.json'), 'utf8')).args || [] : []));
     node(path.join(ENGINE, 'checks', 'verify_anim.js'), [page, '--turns', '12', '--out', 'anim-shots']);
+    if (has('verify_events.js')) node(path.join(GAME_DIR, 'verify_events.js'), []);   /* the game's independent referee, when it has one */
   },
   all() {
     for (const [c, a] of [['parts', []], ['stats', []], ['pack', []], ['jig', []], ['page', ['--no-manual']], ['manual', []], ['page', []], ['lint', []], ['fit', []], ['check', []]]) { console.log(`\n== bg ${c} ${a.join(' ')}`); argv.length = 0; argv.push(...a); commands[c](); }

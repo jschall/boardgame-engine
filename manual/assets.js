@@ -8,7 +8,6 @@
    Writes assets/provenance.json (source hashes) and copies the three Fredoka weights and OFL.txt beside them. All output stays in manual/. */
 'use strict';
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
-const { chromium } = require('playwright');
 const sharp = require('sharp');
 async function main(GAME_DIR) {
   const ROOT = path.join(GAME_DIR, 'manual'), CFG = JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'game.json'), 'utf8'));
@@ -21,7 +20,7 @@ async function main(GAME_DIR) {
   const materials = {};
   for (const sheet of Object.values(P.layout)) for (const [pid] of sheet.items) { if (pid && materials[pid] && materials[pid] !== sheet.mat) throw Error('Conflicting production materials for ' + pid); if (pid) materials[pid] = sheet.mat; }
   fs.mkdirSync(path.join(ROOT, 'assets'), { recursive: true }); fs.mkdirSync(path.join(ROOT, 'tmp'), { recursive: true });
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const browser = await require('../checks/browser.js').launch({ headless: true });
   const page = await browser.newPage();
   const meta = { captured: new Date().toISOString(), sha256: {}, parts: [], renders: {} };
   for (const f of ['parts/parts.json', `${CFG.slug}.html`, CFG.sim, 'table.js']) meta.sha256[f] = crypto.createHash('sha256').update(f === 'parts/parts.json' ? raw : fs.readFileSync(path.join(GAME_DIR, f))).digest('hex');

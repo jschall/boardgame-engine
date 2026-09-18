@@ -3,10 +3,9 @@
    pages in reading order) and a US Letter fold-and-staple booklet (imposed, 135 mm finished), with a layout audit in manual/qa/layout.json.
    The page count is whatever manual.html lays out; it must be a multiple of four for the booklet. node engine/bin/bg.js manual runs it. */
 const fs=require('fs'),path=require('path');
-const {chromium}=require('playwright');
 const {PDFDocument,rgb}=require('pdf-lib');
 const ENGINE=path.join(__dirname,'..'),mm=n=>n*72/25.4;
-const launch=()=>chromium.launch({headless:true,args:['--no-sandbox']});
+const launch=()=>require('../checks/browser.js').launchPlain();
 async function main(GAME_DIR){
  const ROOT=path.join(GAME_DIR,'manual'),CFG=JSON.parse(fs.readFileSync(path.join(GAME_DIR,'game.json'),'utf8')),SLUG=CFG.slug,TITLE=CFG.name;
  for(const d of ['output','tmp/pdfs','qa'])fs.mkdirSync(path.join(ROOT,d),{recursive:true});

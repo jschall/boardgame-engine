@@ -41,7 +41,7 @@ const cfg = JSON.parse(fs.readFileSync(path.join(DIR, 'game.json'), 'utf8')); cf
 fs.writeFileSync(path.join(DIR, '.gitignore'), ['node_modules/', 'parts/', 'pack/', 'preview/', 'shots/', 'anim-shots/', 'judge/', 'manual/output/', 'manual/tmp/', 'manual/qa/', 'manual/assets/render-*.png', `${slug}.html`, 'packing.json', 'jig.json', 'stats.json', 'showcase.json', 'manifest.json', 'manual/rules-data.js', 'manual/assets/provenance.json', ''].join('\n'));
 git(['init', '-q']);
 if (noSub) { fs.mkdirSync(path.join(DIR, 'engine')); copy(ENGINE, path.join(DIR, 'engine')); fs.rmSync(path.join(DIR, 'engine', '.git'), { recursive: true, force: true }); }
-else git(['submodule', 'add', '-q', origin, 'engine']);
+else git((fs.existsSync(origin) ? ['-c', 'protocol.file.allow=always'] : []).concat(['submodule', 'add', '-q', origin, 'engine']));   /* a local engine path needs git's file transport allowed */
 if (!fs.existsSync(path.join(DIR, 'engine', 'node_modules'))) { const r = spawnSync('npm', ['install', '--no-audit', '--no-fund'], { cwd: path.join(DIR, 'engine'), stdio: 'inherit' }); if (r.status !== 0) console.error('npm install in engine/ failed: run it by hand, then npx playwright install chromium'); }
 fs.writeFileSync(path.join(DIR, 'START.md'), `# ${name}
 
