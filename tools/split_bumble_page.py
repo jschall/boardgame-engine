@@ -53,15 +53,25 @@ stock = rep(stock, "    w.postMessage({ type: 'fonts', fonts: FREDOKA, cache: EN
 stock = rep(stock, "      return ['t3', 'tw', 't15'].every(s => P[s + 'lo'] <= P[s + 'hi']) ? P : null;", "      return PARAMS.every(p => P[p.lo] <= P[p.hi]) ? P : null;")
 opening = block("  /* ------------------------------------------------------------ the opening: scrolling opens the box", "  /* ------------------------------------------------------------ go */")
 opening = rep(opening, "pile: pid === 'meadow-frame' ? 'frame' : Math.round(q.x / 2) + '|' + Math.round(q.y / 2),", "pile: need(q, 'pile', 'packing.json placements'),")
-# #shot= is a still or a QA run at scroll 0: the loop must not hand the demo back to the opening (a regression BUMBLE's page had on 2026-09-18)
-opening = rep(opening, "    if (q.shot !== undefined) { introFinish(); return; }", "    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }")
-opening = rep(opening, "  const INTRO = { pending: true, live: false, armed: false,", "  const INTRO = { pending: true, live: false, shot: false, armed: false,")
+# #shot= is a still or a QA run at scroll 0: the loop must not hand the demo back to the opening (BUMBLE's page had this regression on
+# 2026-09-18 and fixed it the same way at 29bb04a; the replacements only apply to a page.js from before)
+if "INTRO.shot" not in opening:
+    opening = rep(opening, "    if (q.shot !== undefined) { introFinish(); return; }", "    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }")
+    opening = rep(opening, "  const INTRO = { pending: true, live: false, armed: false,", "  const INTRO = { pending: true, live: false, shot: false, armed: false,")
+opening = opening.replace("`[bumble ${((performance.now() - T0) / 1000).toFixed(1)}s]`", "`[page ${((performance.now() - T0) / 1000).toFixed(1)}s]`")
 go = '\n'.join(lines[find("  /* ------------------------------------------------------------ go */"):])
 go = rep(go, "  G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); resetShown(); window.__maxSnap = 0;", "  G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); GT.resetShown(G); window.__maxSnap = 0;")
-go = rep(go, "else if (demo.on && mode === 'table' && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();", "else if (demo.on && mode === 'table' && !INTRO.shot && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();")
+if "INTRO.shot" not in go:
+    go = rep(go, "else if (demo.on && mode === 'table' && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();", "else if (demo.on && mode === 'table' && !INTRO.shot && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();")
+# startDemo / stopDemo / demoLoop are the machinery template's; BUMBLE's own startDemo line (with its console line) replaces the template's when it differs
+sd = lines[find("  function startDemo() {")]
+
 go = rep(go, "    window.__scene = scene; window.__qa = () => ({ turn: G && G.turn, over: G && G.over, illegal, mode, playing: demo.on && !paused, tokensOnBoard: tokens.filter(t => t.where !== 'supply').length });",
          "    window.__scene = scene; window.__qa = () => Object.assign({ turn: G && G.turn, over: G && G.over, illegal, mode, playing: demo.on && !paused }, GT.qa ? GT.qa() : {});")
-page = '\n'.join([tpl('head.js'), box_block, tpl('asm.js'), viewer, tpl('qa.js'), sheets, legend, stock, opening, go]) + '\n'
+qa_tpl = tpl('qa.js')
+i0 = qa_tpl.index("  function startDemo() {"); i1 = qa_tpl.index("\n", i0)
+qa_tpl = qa_tpl[:i0] + sd + qa_tpl[i1:]
+page = '\n'.join([tpl('head.js'), box_block, tpl('asm.js'), viewer, qa_tpl, sheets, legend, stock, opening, go]) + '\n'
 for bad in ['BumbleSim', 'BumbleCutView', 'BumbleGeom', 'FREDOKA', "'walnut'", "'basswood", 'COLK', 'FLK', 'skep', 'meadow-frame']:
     assert bad not in page, ('game-specific token left in page.js', bad)
 open(engine + '/page/page.js', 'w').write(page)

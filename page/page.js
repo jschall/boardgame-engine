@@ -284,7 +284,7 @@
       }
     } catch (e) { if (e !== CANCEL) throw e; }
   }
-  function startDemo() { if (demo.on) { paused = false; return; } demo.on = true; paused = false; demoLoop(++runId); }   /* demo.resume set by returnToTable: the loop picks the game up where it stopped */
+  function startDemo() { if (demo.on) { paused = false; return; } demo.on = true; paused = false; dbg(`the game starts (seed ${currentSeed}${demo.resume ? ', resumed' : ''})`); demoLoop(++runId); }   /* demo.resume set by returnToTable: the loop picks the game up where it stopped */
   function stopDemo() { demo.on = false; paused = true; ++runId; focusCell = null; }
   function syncToEngine() { setBoardFromState(G); seen = G.log.length; chips(-1); GT.resetShown(G); GT.syncShown(G); }
 
@@ -589,7 +589,7 @@
      starts by itself; scrolling up again returns the pieces to the table pose and re-arms the opening. The first animation frame starts the
      opening; the headless harness draws no frame, so under fitcheck nothing here runs. */
   const trackEl = el('track'), cueEl = el('cue'), skipEl = el('btn-skip'), hudEl = el('hud'), titleEl = el('intro-title'), spotEl = el('spot');
-  const INTRO = { pending: true, live: false, shot: false, armed: false, returning: false, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], yE: 0, tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [] };
+  const INTRO = { pending: true, live: false, armed: false, returning: false, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], yE: 0, tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [], shot: false };
   const V3 = { dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
     unit: a => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; }, sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]] };
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -900,11 +900,27 @@
     /* a pool of light on the floor under the standing boxes, until the table's own light comes up */
     const sp = scene.project(IB.spotAt[0], IB.spotAt[1], 0); spotEl.style.left = sp[0] + 'px'; spotEl.style.top = sp[1] + 'px'; spotEl.style.opacity = 1 - lights; spotEl.hidden = lights >= 1;
   }
-  const scrollProgress = () => { const range = trackEl.offsetHeight - stageEl.offsetHeight; return range > 0 ? clamp01(-trackEl.getBoundingClientRect().top / range) + 0 : 1; };   /* + 0: never -0 at the top */
+  /* scroll progress through the track, 0 at the top, 1 at the bottom. The last pixel and a half count as the bottom: a browser at a zoom level
+     or a fractional viewport height can stop a fraction of a pixel short of the track's end, and the game must still start there. */
+  const scrollProgress = () => { const range = trackEl.offsetHeight - stageEl.offsetHeight; if (!(range > 0)) return 1; const p = -trackEl.getBoundingClientRect().top / range; return p >= 1 - 1.5 / range ? 1 : clamp01(p) + 0; };   /* + 0: never -0 at the top */
+  /* what the console says (owner, 2026-09-18: "play still isn't starting when i hit the bottom of the page. add console debug as needed"): the
+     first frame, the plan, the start of the game, and, while the reader sits at the bottom with no game running, one status line every two
+     seconds with everything the start depends on. window.__debug() returns the same. */
+  const T0 = performance.now();
+  const dbg = (...a) => console.log(`[page ${((performance.now() - T0) / 1000).toFixed(1)}s]`, ...a);
+  window.__debug = () => { const range = trackEl.offsetHeight - stageEl.offsetHeight; return { scrollY: window.scrollY, innerHeight, scrollHeight: document.documentElement.scrollHeight, trackTop: +trackEl.getBoundingClientRect().top.toFixed(2), range, progress: +scrollProgress().toFixed(4), p: INTRO.p, forced: INTRO.forced, live: INTRO.live, pending: INTRO.pending, planning: !!INTRO.planner, fromTable: INTRO.fromTable, modal: modalOpen(), mode, demo: demo.on, paused, turn: G && G.turn, over: G && G.over, hash: location.hash }; };
+  window.addEventListener('error', e => dbg('uncaught error:', e.message, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : ''));
+  window.addEventListener('unhandledrejection', e => dbg('unhandled rejection:', e.reason && e.reason.message || e.reason));
+  let dbgLast = 0;
+  function dbgBottom(now) {
+    if (now - dbgLast < 2000) return;
+    const d = window.__debug(); if (d.scrollY + d.innerHeight < d.scrollHeight - 8 || d.demo) return;
+    dbgLast = now; dbg('at the bottom, no game running:', JSON.stringify(d));
+  }
   function introInit(now) {
     INTRO.pending = false; INTRO.p = -1;
     const q = Object.fromEntries(hashPairs());
-    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }
+    if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }   /* a harness scene: the scroll stays at the top and never packs the game */
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) { introFinish(); startDemo(); return; }
     if (q.intro !== undefined) INTRO.forced = clamp01(+q.intro);
     introBuild(); INTRO.live = true; scene.dynamic = T.dynamic.concat(INTRO.boxB); scene.opts.fog = FOG; stageEl.classList.add('live');
@@ -922,7 +938,8 @@
     if (INTRO.p >= 0 && INTRO.forced === null) { const k = 1 - Math.exp(-Math.max(0, Math.min(100, now - INTRO.last)) / 90); p = clamp01(INTRO.p + (target - INTRO.p) * k); if (Math.abs(target - p) < 3e-4) p = target; }
     INTRO.last = now;
     if (p !== INTRO.p) { INTRO.p = p; introApply(p); dirty = true; }
-    if (p >= 1 && target >= 1 && INTRO.forced === null) { introFinish(); if (!modalOpen()) startDemo(); }
+    if (p >= 1 && target >= 1 && INTRO.forced === null) { dbg(`bottom reached (p ${p}, target ${target}): the opening ends${modalOpen() ? ', a modal is open so the game waits' : ' and the game starts'}`); introFinish(); if (!modalOpen()) startDemo(); }
+    else dbgBottom(now);
   }
   /** the table as the table view keeps it: every instance back in its table pose, the second box gone, the opening over until the geometry changes */
   function introFinish() {
@@ -935,6 +952,7 @@
   /* the reader scrolled up from the game: it stops where it is, every piece takes the place the engine gives it, and the opening is rebuilt
      from that table, so scrolling up packs this very game into the box and scrolling down unpacks it and lets it go on */
   function returnToTable() {
+    dbg(`scrolled up from the game (progress ${scrollProgress().toFixed(3)}): the pieces go back to the table and the opening is rebuilt`);
     stopDemo(); if (G && !G.over) { syncToEngine(); demo.resume = true; } else { demo.resume = false; logEl.innerHTML = ''; }
     for (const inst of T.static.concat(T.dynamic)) inst.group = undefined;
     INTRO.resumeFrom = 1; INTRO.pending = true;
@@ -957,13 +975,16 @@
     if (!INTRO.planner) return;
     const t = performance.now(); let r;
     do { r = INTRO.planner.next(); } while (!r.done && performance.now() - t < 8);
-    if (r.done) { INTRO.planner = null; INTRO.end = r.value; waiting(false); dirty = true; }
+    if (r.done) { INTRO.planner = null; INTRO.end = r.value; waiting(false); dirty = true; dbg(`flight plan ready: the last piece lands at p ${(+r.value).toFixed(3)}`); }
   }
   let firstFrame = true, signalled = false;
   function loop(now) {
     if (INTRO.pending) introInit(now);
-    else if (INTRO.live) introUpdate(now); else if (demo.on && mode === 'table' && !INTRO.shot && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();
-    if (dirty) { dirty = false; scene.render(); if (firstFrame) { firstFrame = false; loadingEl.hidden = true; }
+    else if (INTRO.live) introUpdate(now); else if (INTRO.shot) { /* a #shot= scene: the hash decides what runs */ }
+    else if (demo.on && mode === 'table' && !modalOpen() && !INTRO.returning && scrollProgress() < 0.998) returnToTable();
+    else if (!demo.on && mode === 'table' && !modalOpen() && scrollProgress() >= 1) { dbg('at the bottom with the table shown and no game running: the game starts'); startDemo(); }   /* the opening ended under a modal, or ended without the game for any other reason */
+    else if (!demo.on) dbgBottom(now);
+    if (dirty) { dirty = false; scene.render(); if (firstFrame) { firstFrame = false; loadingEl.hidden = true; dbg('first frame drawn'); }
       if (!signalled && !INTRO.planner && !INTRO.pending) { signalled = true; if (window.__signalReady) window.__signalReady(); } }
     advancePlan();
     requestAnimationFrame(loop);
