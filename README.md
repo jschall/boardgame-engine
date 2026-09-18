@@ -16,7 +16,11 @@ Everything hard about producing a laser-cut board game, in one repository a game
 /plugin install boardgame-create --marketplace jschall/boardgame-engine
 ```
 
-(or `/plugin marketplace add jschall/boardgame-engine` then `/plugin install boardgame-create@boardgame-engine`); this repository is the marketplace (`.claude-plugin/marketplace.json`). Without the plugin system, copy `plugins/boardgame-create/skills/boardgame-create` into `~/.claude/skills/`.
+(or `/plugin marketplace add jschall/boardgame-engine` then `/plugin install boardgame-create@boardgame-engine`); this repository is the marketplace (`.claude-plugin/marketplace.json`). Without the plugin system, copy `plugins/boardgame-create/skills/boardgame-create` into `~/.claude/skills/`. Then, in an empty folder, a prompt like
+
+> Recreate Catan for my laser: 3 mm birch ply and 1.5 mm birch, kerf 0.18, a 40 W diode with a 300 x 450 mm bed. Keep the trading and the robber, replace the dice with something the wood can make, and design the box so every piece stores in a tray.
+
+yields the game folder with its cut sheets, the box and its glue jig, the packing, the page and the rulebook (`plugins/boardgame-create/README.md` has a longer example).
 
 BUMBLE & BLOOM (`~/junk/boardgame/bumble`) is the first game on it and the reference: everything here was cut and validated on its wood. ORCHARD (`starter/`) is a complete small game every new game begins as.
 
