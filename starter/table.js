@@ -5,7 +5,7 @@
    No // line comments in this file: it is embedded inline. */
 function GameTable(api) {
   'use strict';
-  const { S, META, PARTS, need, part, mk, posed, setPose, rotXY, ez, STOCK_T, IN, tray, neck, standingPair, standee, exFor, addAsm, tween, wait, arc, log, pick } = api;
+  const { S, META, PARTS, need, part, mk, posed, setPose, rotXY, ez, STOCK_T, stockOf, IN, tray, neck, standingPair, standee, exFor, addAsm, tween, wait, arc, log, pick } = api;
   const NP = 4, players = S.PLAYERS.map(p => ({ name: p.name, colour: p.colour, title: p.title }));
   const NAMES = players.map(p => p.name), FRUIT = S.FRUITS.map(f => f.key);
   const dot = c => api.dot(c), say = (c, line) => api.say(c, line);
@@ -65,7 +65,7 @@ function GameTable(api) {
     ['Order cards', S.ORDERS.map((o, i) => 'order-' + i)],
   ];
 
-  const SAY = { pick: ['Lovely.', 'Into the basket.', 'Ripe, that one.'], deliver: ['Order up!', 'That is the one I wanted.', 'Paid in fruit.'], crow: ['Shoo!', 'Not my tree, please.', 'Off you go, bird.'], full: ['Basket is full.', 'No room left.'], drop: ['I will leave this one.'] };
+  const SAY = { pick: ['Lovely.', 'Into the basket.', 'Ripe, that one.'], deliver: ['Order up!', 'That is the one I wanted.', 'Paid in fruit.'], crow: ['Shoo!', 'Not my tree, please.', 'Off you go, bird.'], scared: ['Hey! My fruit!', 'That bird again.', 'Come back with that!'], full: ['Basket is full.', 'No room left.'], drop: ['I will leave this one.'] };
   const fruitName = k => S.FRUITS.find(f => f.key === k).name;
 
   /* ------------------------------------------------------------ setting the table (initTable) and the moves (animateEvents, one visible motion per event) */
@@ -101,7 +101,7 @@ function GameTable(api) {
         const tok = supplyToken(e.fruit); tok.where = 'basket'; const j = basketTok[e.c].length; basketTok[e.c].push(tok); await flyToken(tok, basketXY(e.c, j), my);
         if (qr() < .3) say(e.c, pick(e.full ? SAY.full : SAY.pick));
       } else if (e.type === 'drop') {
-        log(`${dot(e.c)}${NAMES[e.c]} puts a ${fruitName(e.fruit)} back.`, 'sys');
+        log(e.scared ? `${dot(e.c)}The <b>crow</b> scares ${NAMES[e.c]}: a ${fruitName(e.fruit)} drops back into the lid.` : `${dot(e.c)}${NAMES[e.c]} puts a ${fruitName(e.fruit)} back.`, 'sys');
         const j = basketTok[e.c].findIndex(t => t.type === e.fruit); const tok = basketTok[e.c].splice(j, 1)[0]; tok.where = 'supply'; await flyToken(tok, tok.home, my);
         for (let k = 0; k < basketTok[e.c].length; k++) { const p = basketXY(e.c, k), t = basketTok[e.c][k]; Object.assign(t.inst, { x: p[0], y: p[1], z: p[2], rot: p[3] }); }
         if (qr() < .5) say(e.c, pick(SAY.drop));
@@ -125,8 +125,13 @@ function GameTable(api) {
         const cd = cards[e.order], k = G.market.indexOf(e.order); log(`${S.ORDERS[e.order].name} comes up at the market.`, 'sys');
         const [x, y] = MARKET(k); cd.where = 'market'; await flyCard(cd, [x, y, 0], 0, false, my);
         G.deck.forEach((oi, j) => { setPose(cards[oi].inst, [CARD[0] / 2, CARD[1] / 2], DECK[0], DECK[1], j * STOCK_T('t15'), 0); });
+      } else if (e.type === 'steal') {
+        log(`${dot(e.c)}The <b>crow</b> scares ${NAMES[e.from]}: a ${fruitName(e.fruit)} goes to <b>${NAMES[e.c]}</b>${e.full ? ', whose basket is now full' : ''}.`);
+        const j = basketTok[e.from].findIndex(t => t.type === e.fruit); const tok = basketTok[e.from].splice(j, 1)[0]; const k = basketTok[e.c].length; basketTok[e.c].push(tok); await flyToken(tok, basketXY(e.c, k), my, 80, 900);
+        for (let k2 = 0; k2 < basketTok[e.from].length; k2++) { const p = basketXY(e.from, k2), t = basketTok[e.from][k2]; Object.assign(t.inst, { x: p[0], y: p[1], z: p[2], rot: p[3] }); }
+        if (qr() < .7) say(e.from, pick(SAY.scared));
       } else if (e.type === 'crow') {
-        log(`${dot(e.c)}${NAMES[e.c]} rolls ${e.roll}: the <b>crow</b> flies to the ${fruitName(G.trees[e.to])} tree.`, 'sys'); api.focus.cell = e.to;
+        log(`${dot(e.c)}${NAMES[e.c]} flies the <b>crow</b> ${e.steps === 1 ? 'one tree' : e.steps + ' trees'} on, to the ${fruitName(G.trees[e.to])} tree.`, 'sys'); api.focus.cell = e.to;
         const a = [crow.base.x, crow.base.y, crow.base.z], [x, y] = crowXY(e.to); await tween(1000, u => { const p = arc(a, [x, y, 3], u, 90); placeStandee(crow, p[0], p[1], p[2]); }, my);
         for (let c = 0; c < G.players; c++) if (G.farmers[c] === e.to && qr() < .6) say(c, pick(SAY.crow));
       } else if (e.type === 'trigger') { log(e.reason === 'orders' ? `${dot(e.c)}<b>${NAMES[e.c]}</b> has delivered ${G.rules.ordersToEnd} orders: the round is the last.` : 'A fruit has run out: the round is the last.', 'round'); }
@@ -142,7 +147,7 @@ function GameTable(api) {
     log('The season is over', 'round');
     for (let c = 0; c < G.players; c++) {
       for (let k = 0; k < G.done[c].length; k++) { const cd = cards[G.done[c][k]]; const z0 = cd.inst.z; await tween(350, u => { cd.inst.z = z0 + 30 * ez(u); }, my); cd.inst.flipped = false; await tween(350, u => { cd.inst.z = z0 + 30 * (1 - ez(u)); }, my); }
-      log(`${dot(c)}<b>${NAMES[c]}</b>: ${G.done[c].map(oi => S.ORDERS[oi].name).join(', ') || 'no orders'}. <b>${scores[c].total}</b>`, 'end');
+      log(`${dot(c)}<b>${NAMES[c]}</b>: ${G.done[c].map(oi => S.ORDERS[oi].name).join(', ') || 'no orders'}${scores[c].owed ? ` (${scores[c].owed} owed for ${G.hand[c].map(oi => S.ORDERS[oi].name).join(' and ')})` : ''}. <b>${scores[c].total}</b>`, 'end');
       await wait(600, my);
     }
     log(`${dot(winner)}<b>${NAMES[winner]} wins with ${scores[winner].total}.</b>`, 'end');
@@ -166,11 +171,19 @@ function GameTable(api) {
       else if (G.trees[shown.farmers[e.c]] !== e.fruit) bad(`the tree shown grows ${G.trees[shown.farmers[e.c]]}, the engine picks ${e.fruit}`);
     } else if (e.type === 'deliver') {
       if (basketTok[e.c].length < e.gave.length) bad('the basket shown has too few fruit');
+    } else if (e.type === 'crow') {
+      const steps = (S.PATH.indexOf(e.to) - S.PATH.indexOf(shown.crow) + S.PATH.length) % S.PATH.length;
+      if (steps < 1 || steps > G.rules.crowMoves) bad(`the crow flies ${steps} trees, not 1 to ${G.rules.crowMoves}`);
+    } else if (e.type === 'steal') {
+      if (shown.farmers[e.from] !== shown.crow) bad('the crow is not on that farmer\'s tree');
+      else if (!basketTok[e.from].some(t => t.type === e.fruit)) bad('the basket shown has no such fruit');
+      else if (shown.baskets[e.c] >= G.rules.basket) bad('the flyer\'s basket shown is full');
     }
   }
   function noteShown(e) {
     if (e.type === 'move') shown.farmers[e.c] = e.to; else if (e.type === 'crow') shown.crow = e.to;
     else if (e.type === 'pick') shown.baskets[e.c]++; else if (e.type === 'drop') shown.baskets[e.c]--; else if (e.type === 'deliver') shown.baskets[e.c] -= e.gave.length;
+    else if (e.type === 'steal') { shown.baskets[e.from]--; shown.baskets[e.c]++; }
   }
   /** where every moving piece belongs for the engine's state G, using the pieces the animation assigned: [[inst, x, y, z, rot, rotation period], ...] */
   function syncBoard() {

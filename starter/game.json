@@ -10,5 +10,6 @@
   "code": "",
   "geom": "geom.js",
   "geom_files": ["engine/lib/lasergeom.js", "engine/src/stock.js", "engine/src/shapes.js", "engine/src/box.js", "engine/src/geom.js", "orchard-sim.js", "rules.js", "art.js", "geom.js"],
-  "manual": { "pages": 12 }
+  "manual": { "pages": 12 },
+  "balance": { "rounds": "5:9", "seat": 0.07, "goals": "0.3:0.9" }
 }

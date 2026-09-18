@@ -51,6 +51,47 @@
     return Object.assign({}, spec, { parts: out });
   }
 
+  /** a tray with pockets for pieces (the tray competency), usable from make_game and from a hand-written generator (BUMBLE):
+   *  make_tray(p, { stocks, F, pieceOf(id) -> { shape, stock } }) -> { parts: [{ pid, kind, stock, name, shape, art, edge }], meta }
+   *  Pocket = the piece's outline plus POCKET_CLEARANCE all round. With a thinner stock in the game the pockets are cut out of it (the frame) and
+   *  laminated on a back (p.stock: thin or thick, the author's choice of material use); a piece must stand POCKET_PROUD above the frame or the pocket
+   *  gets a finger notch. With no thinner stock the pockets are engraved into the tray (one part; the laser's engraving depth is the pocket depth).
+   *  p: { id, count, stock, name, pockets: [{ piece | shape, t, x, y, rot, notch }], frame, margin, r, shape, art (the back), frame_art, store } */
+  function make_tray(p, ctx) {
+    const { stocks, F, pieceOf } = ctx, D = K.DESIGN, EMPTY = lg.EMPTY;
+    if (!Array.isArray(p.pockets) || !p.pockets.length) throw new Error(`tray ${p.id}: pockets = [{ piece | shape, x, y, rot, notch }]`);
+    const piece = q => { if (!q.piece) return null; const r = pieceOf(q.piece); if (!r || !r.shape) throw new Error(`tray ${p.id}: pocket piece ${q.piece} is not a flat part`); return r; };
+    const pieceShape = q => q.piece ? piece(q).shape : q.shape, pieceT = q => q.piece ? F.stocks[piece(q).stock].t : (q.t || F.stocks[p.stock].t);
+    if (p.frame && !stocks[p.frame]) throw new Error(`tray ${p.id}: frame ${p.frame} is not a stock`);
+    const thinner = Object.keys(stocks).filter(k => k !== p.stock && stocks[k].nominal < 0.75 * Math.min(...p.pockets.map(pieceT))).sort((a, b) => stocks[a].nominal - stocks[b].nominal);
+    const frame = p.frame === null ? null : p.frame !== undefined ? p.frame : (thinner[0] || null);
+    const pockets = p.pockets.map((q, i) => {
+      if (!q.piece && !(q.shape && q.shape.geom_type)) throw new Error(`tray ${p.id}: pocket ${i} names a piece or gives a shape`);
+      const sh = affinity.translate(affinity.rotate(pieceShape(q), q.rot || 0, [0, 0]), q.x || 0, q.y || 0), b = sh.bounds;
+      const hole = sh.buffer(D.POCKET_CLEARANCE, { join_style: 'round', quad_segs: 6 });
+      const proud = pieceT(q) - (frame ? F.stocks[frame].t : 0);
+      const side = q.notch === undefined ? ((b[2] - b[0]) >= (b[3] - b[1]) ? 'S' : 'E') : q.notch;   /* the notch on the pocket's longer side */
+      const notch = frame && proud < D.POCKET_PROUD && side ? C(side === 'S' || side === 'N' ? (b[0] + b[2]) / 2 : side === 'E' ? b[2] + D.POCKET_CLEARANCE : b[0] - D.POCKET_CLEARANCE, side === 'S' ? b[3] + D.POCKET_CLEARANCE : side === 'N' ? b[1] - D.POCKET_CLEARANCE : (b[1] + b[3]) / 2, D.NOTCH_R, 16) : null;
+      return { i, piece: q.piece || null, x: q.x || 0, y: q.y || 0, rot: q.rot || 0, hole, notch, proud, t: pieceT(q), bounds: hole.bounds, w: +(b[2] - b[0]).toFixed(2), h: +(b[3] - b[1]).toFixed(2) };
+    });
+    const hb = pockets.map(q => q.notch ? q.hole.union(q.notch).bounds : q.bounds), M = p.margin || 6;
+    const x0 = Math.min(...hb.map(b => b[0])) - M, y0 = Math.min(...hb.map(b => b[1])) - M, x1 = Math.max(...hb.map(b => b[2])) + M, y1 = Math.max(...hb.map(b => b[3])) + M;
+    const outer = p.shape || rrect(x0, y0, x1, y1, p.r || 3.0);
+    for (const q of pockets) if (outer.buffer(-2.0).contains(q.hole) === false) throw new Error(`tray ${p.id}: pocket ${q.i} comes within 2 mm of the tray's edge`);
+    for (let a = 0; a < pockets.length; a++) for (let b = a + 1; b < pockets.length; b++) if (pockets[a].hole.distance(pockets[b].hole) < 2.0) throw new Error(`tray ${p.id}: pockets ${a} and ${b} leave less than 2 mm of wood between them`);
+    const holes = unary_union(pockets.map(q => q.notch ? q.hole.union(q.notch) : q.hole));
+    const parts = [];
+    if (frame) {   /* the back (p.stock) with its art, the frame (thin) with the pockets cut out and the frame_art */
+      parts.push({ pid: p.id, kind: 'tray', stock: p.stock, name: p.name, shape: outer, art: () => p.art ? p.art() : EMPTY, edge: outer });
+      const frameShape = outer.difference(holes);
+      if (frameShape.geom_type !== 'Polygon') throw new Error(`tray ${p.id}: the pockets cut the frame into pieces`);
+      parts.push({ pid: p.id + '-frame', kind: 'tray-frame', stock: frame, name: `${p.name}, pocket layer`, shape: frameShape, art: () => p.frame_art ? p.frame_art() : EMPTY, edge: outer });
+    } else parts.push({ pid: p.id, kind: 'tray', stock: p.stock, name: p.name, shape: outer, art: () => unary_union([holes, p.art ? p.art() : EMPTY]), edge: outer });   /* one part: the pockets engraved */
+    const meta = { w: +(outer.bounds[2] - outer.bounds[0]).toFixed(2), h: +(outer.bounds[3] - outer.bounds[1]).toFixed(2), x0: +outer.bounds[0].toFixed(2), y0: +outer.bounds[1].toFixed(2), frame, back: p.stock, depth: frame ? F.stocks[frame].t : null, engraved: !frame, store: p.store !== false,
+      pockets: pockets.map(q => ({ i: q.i, piece: q.piece, x: q.x, y: q.y, rot: q.rot, w: q.w, h: q.h, t: q.t, proud: +q.proud.toFixed(2), notch: !!q.notch })) };
+    return { parts, meta, frame };
+  }
+
   /** the outline a part is cut to (nominal, before compensation) and its thickness class; used by the packer and the table */
   function make_game(spec0, opts = {}) {
     const spec = normalize(spec0), stocks = spec.stocks, box = spec.box;
@@ -127,42 +168,11 @@
           const registered = keyed(p.id, whole, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: whole, eng_post: g => K.clip_out(g, site.removed.buffer(0.6), 0.6, 1.2), eng_post_key: 'leaf:' + [fs.slot_len, fs.slot_w, kerf_of(p.id), p.key].join(',') });
           if (registered) K.leaf_part(lay, p.id, whole, site);
         };
-        /* a tray with pockets for pieces (the tray competency). Pocket = the piece's outline plus POCKET_CLEARANCE all round. With a thin stock in
-           the game the pockets are cut out of it (the frame) and laminated on a back (p.stock: thin or thick, the author's choice of material use);
-           a piece must stand POCKET_PROUD above the frame or the pocket gets a finger notch. With no thinner stock the pockets are engraved into the
-           tray (one part; the laser's engraving depth is the pocket depth, so every piece stands proud). */
+        /* a tray with pockets for pieces (the tray competency): the engine's make_tray, registered here */
         const tray = (p) => {
-          const D = K.DESIGN, pieceOf = q => q.piece ? spec.parts.find(r => r.id === q.piece) : null;
-          const pieceShape = q => q.piece ? pieceOf(q).shape : q.shape, pieceT = q => q.piece ? F.stocks[pieceOf(q).stock].t : (q.t || F.stocks[p.stock].t);
-          const thinner = Object.keys(stocks).filter(k => k !== p.stock && stocks[k].nominal < 0.75 * Math.min(...p.pockets.map(pieceT))).sort((a, b) => stocks[a].nominal - stocks[b].nominal);
-          const frame = p.frame === null ? null : p.frame !== undefined ? p.frame : (thinner[0] || null);
-          const pockets = p.pockets.map((q, i) => {
-            const sh = affinity.translate(affinity.rotate(pieceShape(q), q.rot || 0, [0, 0]), q.x || 0, q.y || 0), b = sh.bounds;
-            const hole = sh.buffer(D.POCKET_CLEARANCE, { join_style: 'round', quad_segs: 6 });
-            const proud = pieceT(q) - (frame ? F.stocks[frame].t : 0);
-            const side = q.notch === undefined ? ((b[2] - b[0]) >= (b[3] - b[1]) ? 'S' : 'E') : q.notch;   /* the notch on the pocket's longer side */
-            const notch = frame && proud < D.POCKET_PROUD && side ? C(side === 'S' ? (b[0] + b[2]) / 2 : side === 'N' ? (b[0] + b[2]) / 2 : side === 'E' ? b[2] + D.POCKET_CLEARANCE : b[0] - D.POCKET_CLEARANCE, side === 'S' ? b[3] + D.POCKET_CLEARANCE : side === 'N' ? b[1] - D.POCKET_CLEARANCE : (b[1] + b[3]) / 2, D.NOTCH_R, 16) : null;
-            return { i, piece: q.piece || null, x: q.x || 0, y: q.y || 0, rot: q.rot || 0, hole, notch, proud, bounds: hole.bounds, w: +(b[2] - b[0]).toFixed(2), h: +(b[3] - b[1]).toFixed(2) };
-          });
-          const hb = pockets.map(q => q.notch ? q.hole.union(q.notch).bounds : q.bounds), M = p.margin || 6;
-          const x0 = Math.min(...hb.map(b => b[0])) - M, y0 = Math.min(...hb.map(b => b[1])) - M, x1 = Math.max(...hb.map(b => b[2])) + M, y1 = Math.max(...hb.map(b => b[3])) + M;
-          const outer = p.shape || rrect(x0, y0, x1, y1, p.r || 3.0);
-          for (const q of pockets) if (outer.buffer(-2.0).contains(q.hole) === false) throw new Error(`tray ${p.id}: pocket ${q.i} comes within 2 mm of the tray's edge`);
-          for (let a = 0; a < pockets.length; a++) for (let b = a + 1; b < pockets.length; b++) if (pockets[a].hole.distance(pockets[b].hole) < 2.0) throw new Error(`tray ${p.id}: pockets ${a} and ${b} leave less than 2 mm of wood between them`);
-          const holes = unary_union(pockets.map(q => q.notch ? q.hole.union(q.notch) : q.hole));
-          part_name[p.id] = p.name; setStock(p.id, p.stock);
-          if (frame) {   /* the back (p.stock) with the tray's art, the frame (thin) with the pockets cut out */
-            part_kind[p.id] = 'tray'; part_kind[p.id + '-frame'] = 'tray-frame'; part_name[p.id + '-frame'] = `${p.name}, pocket layer`; setStock(p.id + '-frame', frame);
-            keyed(p.id, outer, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: outer });
-            const frameShape = outer.difference(holes);
-            if (frameShape.geom_type !== 'Polygon') throw new Error(`tray ${p.id}: the pockets cut the frame into pieces`);
-            keyed(p.id + '-frame', frameShape, `part:${p.id}:frame`, () => p.frame_art ? p.frame_art() : EMPTY, { edge: outer });
-          } else {   /* one part: the pockets engraved */
-            part_kind[p.id] = 'tray';
-            keyed(p.id, outer, `part:${p.id}`, () => unary_union([holes, p.art ? p.art() : EMPTY]), { edge: outer });
-          }
-          trays[p.id] = { w: +(outer.bounds[2] - outer.bounds[0]).toFixed(2), h: +(outer.bounds[3] - outer.bounds[1]).toFixed(2), x0: +outer.bounds[0].toFixed(2), y0: +outer.bounds[1].toFixed(2), frame, back: p.stock, depth: frame ? F.stocks[frame].t : null, engraved: !frame,
-            pockets: pockets.map(q => ({ i: q.i, piece: q.piece, x: q.x, y: q.y, rot: q.rot, w: q.w, h: q.h, proud: +q.proud.toFixed(2), notch: !!q.notch })) };
+          const T = make_tray(p, { stocks, F, pieceOf: id => { const q = spec.parts.find(r => r.id === id); return q && { shape: q.shape, stock: q.stock }; }, EMPTY });
+          for (const q of T.parts) { setStock(q.pid, q.stock); part_kind[q.pid] = q.kind; part_name[q.pid] = q.name; keyed(q.pid, q.shape, `part:${q.pid}`, q.art, { edge: q.edge }); }
+          trays[p.id] = T.meta;
         };
         const pair = (p) => {
           const tile = spec.parts.find(q => q.kind === 'tile' && q.plus && q.plus.pair === p.id);
@@ -171,7 +181,7 @@
           const H = -p.silhouette.bounds[1];
           for (const [half, front] of [['a', true], ['b', false]]) {
             const pid = `${p.id}-${half}`; setStock(pid, p.stock); setStock(pid + '-back', p.stock); part_kind[pid] = 'pair'; part_name[pid] = `${p.name}, ${front ? 'front' : 'back'} half`;
-            const make = (f) => { const [tab] = K.spring_tab(K.DESIGN.STAND_TAB, f.tab_depth, 2.5); const sil = unary_union([p.silhouette, tab]); return K.crosslap(sil, H, front, f.xlap_w, f.xlap_over, f.below); };
+            const make = (f) => { const [tab] = K.spring_tab(K.DESIGN.STAND_TAB, f.tab_depth, 2.5); const sil = unary_union([p.silhouette, tab]); return K.crosslap(sil, H, front, f.xlap_w, f.xlap_over, f.below, `pair ${p.id}`); };
             const snom = memo(`pair:${pid}:nominal`, () => make(fp0)), shape = memo(`pair:${pid}:${[fp.tab_depth, fp.xlap_w, fp.below].join(',')}`, () => make(fp));
             const band = K.centre_band(fp.centre_half).buffer(0.25), band_back = K.back_art(snom, band), bk = `band:${fp.centre_half}`;
             keyed(pid, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: snom, eng_post: g => K.clip_out(g, band, 0.6, 1.2), eng_post_key: bk });
@@ -323,5 +333,5 @@
     };
     return GAME;
   }
-  return { make_game, normalize, KINDS, SHEET_W, SHEET_H };
+  return { make_game, make_tray, normalize, KINDS, SHEET_W, SHEET_H };
 });

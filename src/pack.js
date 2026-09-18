@@ -45,7 +45,7 @@ for (const [pid, inner] of Object.entries(PJ.parts)) {
 const BOX_T = META.stocks[META.box_stock].t;
 const K = { T: BOX_T, TW: META.stocks[META.neck_stock].t, INNER: META.INNER, WALL_H: META.WALL_H, FLOOR_UP: META.FLOOR_UP, GAP: META.GAP, NECK_H: META.NECK_H, NECK_CL: META.NECK_CL };
 const r2 = v => pyround(v, 2), r3 = v => pyround(v, 3);
-const SLACK = 1.0, GAP_XY = 0.5, PLY_TOL = 0.2;
+const SLACK = 1.0, GAP_XY = 0.5, PLY_TOL = 0.2, POCKET_CLEARANCE = require('./stock.js').DESIGN.POCKET_CLEARANCE;
 
 // ------------------------------------------------------------------ the interior, from the box geometry
 const NECK_T = (META.fits && META.fits.NECK_T !== undefined) ? META.fits.NECK_T : K.TW;
@@ -78,11 +78,29 @@ function take(pid, n = 1) {
   if (!((pool[pid] || 0) >= n)) throw new Error(`not enough ${pid}`);
   pool[pid] -= n; return Array(n).fill(pid);
 }
-/* the piles: the game's pack.js decides, or the default by part kind. columns: [name, [pids bottom to top] | [[dx, dy, pids]], shelf preference]
-   ('floor', 'top' or 'any'); the game may also give place(name, pids, ctx) for piles it fixes by hand, flat_top (id prefixes that can carry piles) and
-   clearance(a, b) (the gap two pieces need, when not GAP_XY) */
+/* the piles: the game's pack.js decides, or the default by part kind. columns: [name, [pids bottom to top] | [[dx, dy, pids, dz, srot]], shelf preference]
+   ('floor', 'top' or 'any'): a stack is a list of pids at (dx, dy) in the pile's frame, starting dz above the pile's bottom, turned srot degrees on its
+   own centre (a piece in a tray's pocket). The game may also give place(name, pids, ctx) for piles it fixes by hand, flat_top (id prefixes that can
+   carry piles) and clearance(a, b) (the gap two pieces need, when not GAP_XY) */
 const kind_of = pid => (META.part_kind || {})[pid] || 'plate';
 const GAME_PACK = fs.existsSync(path.join(HERE, 'pack.js')) ? require(path.join(HERE, 'pack.js')) : null;
+/* a tray loaded with its pieces: the back, the frame on it, and in each pocket the piece it was cut for, taken from the pool while there are any
+   (META.trays[pid].pockets, the tray competency); the tray's height is what the next tray rests on. group: the pieces that may touch (0.3 mm pockets) */
+let tray_groups = 0;
+function loaded_tray(pid, want = null) {
+  const tr = (META.trays || {})[pid]; if (!tr) throw new Error(`${pid} is not a tray in META.trays`);
+  const group = ++tray_groups, back = take(pid)[0], stacks = [[0.0, 0.0, [back], 0.0, 0, group]];
+  let top = thick(back);
+  if (inventory[pid + '-frame']) { stacks[0][2].push(take(pid + '-frame')[0]); top += thick(pid + '-frame'); }
+  const store = tr.store !== false;
+  /* a pocket takes the piece it was cut for while there are any, then any piece of the same kind and outline (a basket's apple pocket holds a pear) */
+  const same = q => { const b0 = OUTLINES[q.piece].bounds, k0 = kind_of(q.piece); return Object.keys(pool).find(p => pool[p] > 0 && p !== q.piece && kind_of(p) === k0 && OUTLINES[p] && OUTLINES[p].bounds.every((v, i) => Math.abs(v - b0[i]) < 0.05) && Math.abs(OUTLINES[p].area - OUTLINES[q.piece].area) < 0.5); };
+  for (const q of tr.pockets) { const piece = want ? want(q) : (q.piece && pool[q.piece] > 0 ? q.piece : q.piece ? same(q) : null); if (!store || !piece || !(pool[piece] > 0)) continue;
+    stacks.push([q.x, q.y, take(piece), thick(back), q.rot || 0, group]); top = Math.max(top, thick(back) + thick(piece)); }
+  return { pid, stacks, h: top };
+}
+/** loaded trays one on the other: the stacks of each lifted by the heights below it */
+const stack_trays = loaded => { const out = []; let z = 0; for (const t of loaded) { for (const st of t.stacks) out.push([st[0], st[1], st[2], (st[3] || 0) + z, st[4] || 0, st[5]]); z += t.h; } return out; };
 function default_columns() {
   const cols = [], by = {};
   for (const pid of Object.keys(inventory).sort()) (by[kind_of(pid)] = by[kind_of(pid)] || []).push(pid);
@@ -91,20 +109,24 @@ function default_columns() {
   const fits = pids => Math.max(1, Math.floor(BUDGET_H / thick(pids[0])));   /* how many of a piece stack in the box's height */
   const sig = pid => { const b = OUTLINES[pid].bounds; return [Math.round(b[2] - b[0]), Math.round(b[3] - b[1])].join('x'); };
   /* pieces of one kind and size stack together: boards on the floor, tiles in even stacks, cards in one stack, tokens by kind, standing pieces and bases flat in the gaps */
-  const bySig = pids => { const m = new Map(); for (const p of pids) { const k = sig(p); if (!m.has(k)) m.set(k, []); m.get(k).push(...take(p, inventory[p])); } return [...m.entries()]; };
-  /* laminated trays pack as themselves, the frame on its back; trays of one outline stack in one pile, as many as the box's height takes */
-  { const stacks = new Map();
-    for (const pid of by.tray || []) { const n = inventory[pid], frame = inventory[pid + '-frame'] ? take(pid + '-frame', n) : [], backs = take(pid, n); const k = sig(pid); if (!stacks.has(k)) stacks.set(k, []); for (let i = 0; i < n; i++) stacks.get(k).push(backs[i], ...(frame[i] ? [frame[i]] : [])); }
-    for (const [k, pids] of stacks) { const per = Math.max(1, Math.floor(BUDGET_H / pids.reduce((a, p) => a + thick(p), 0) * pids.length)); chunk(`trays ${k}`, pids, per, 'floor'); } }
+  const bySig = pids => { const m = new Map(); for (const p of pids) { if (!pool[p]) continue; const k = sig(p); if (!m.has(k)) m.set(k, []); m.get(k).push(...take(p, pool[p])); } return [...m.entries()]; };   /* what the trays did not take */
+  /* the trays go in loaded: each pocket takes its piece from the pool (the pieces are stored in their trays), the frame lies on its back, and trays of
+     one outline stack in one pile, each on the one below (on the pieces standing proud, else on the frame), as many as the box's height takes */
+  { const groups = new Map();
+    for (const pid of by.tray || []) { const k = sig(pid); if (!groups.has(k)) groups.set(k, []); for (let i = 0; i < inventory[pid]; i++) groups.get(k).push(pid); }
+    for (const [k, trays] of groups) {
+      const loaded = trays.map(pid => loaded_tray(pid)), per = Math.max(1, Math.floor(BUDGET_H / loaded[0].h));
+      for (let i = 0, n = 1; i < loaded.length; i += per, n++) cols.push([trays.length > per ? `trays ${k} ${n}` : `trays ${k}`, stack_trays(loaded.slice(i, i + per)), 'floor']);
+    } }
   for (const [k, pids] of bySig(by.board || [])) chunk(`boards ${k}`, pids, fits(pids), 'floor');
   for (const [k, pids] of bySig(by.tile || [])) chunk(`tiles ${k}`, pids, fits(pids), 'floor');
   for (const [k, pids] of bySig(by.card || [])) chunk(`cards ${k}`, pids, fits(pids), 'any');
-  for (const pid of by.token || []) chunk(`${pid} tokens`, take(pid, inventory[pid]), Math.min(10, fits([pid])), 'any');
+  for (const pid of by.token || []) if (pool[pid]) chunk(`${pid} tokens`, take(pid, pool[pid]), Math.min(10, fits([pid])), 'any');
   for (const [k, pids] of bySig((by.pair || []).concat(by.standee || []))) chunk(`standing pieces ${k}`, pids, 4, 'any');
-  for (const pid of (by.base || []).concat(by.plate || [])) chunk(pid, take(pid, inventory[pid]), 3, 'any');
+  for (const pid of (by.base || []).concat(by.plate || [])) if (pool[pid]) chunk(pid, take(pid, pool[pid]), 3, 'any');
   return cols;
 }
-const ctx0 = { META, K, inventory, take, OUTLINES, thick, lg, kind_of };
+const ctx0 = { META, K, inventory, take, OUTLINES, thick, lg, kind_of, loaded_tray, stack_trays };
 const GP = GAME_PACK ? GAME_PACK(ctx0) : { columns: default_columns() };
 let columns = GP.columns;
 columns = columns.map(([nm, st, pref]) => [nm, Array.isArray(st[0]) ? st : [[0.0, 0.0, st]], pref]);
@@ -172,8 +194,9 @@ if (process.env.PACK_SHAPES_JSON) {   // diagnostic: packing shapes computed els
   for (const p of Object.keys(inventory)) { const m = S[p]; PACK_SHAPE[p] = m.type === 'Polygon' ? poly(m.coordinates) : unary_union(m.coordinates.map(poly)); }
 }
 const ROTS = [0, 90, 180, 270];
-const at = (g, dx, dy, rot, x = 0.0, y = 0.0) => affinity.translate(affinity.rotate(affinity.translate(g, dx, dy), rot, [0, 0]), x, y);
-const footprint = (stacks, rot) => unary_union(stacks.flatMap(([dx, dy, pids]) => [...new Set(pids)].map(p => at(PACK_SHAPE[p], dx, dy, rot))));
+const at = (g, dx, dy, rot, x = 0.0, y = 0.0, srot = 0) => affinity.translate(affinity.rotate(affinity.translate(srot ? affinity.rotate(g, srot, [0, 0]) : g, dx, dy), rot, [0, 0]), x, y);
+const stack_h = ([, , pids, dz]) => (dz || 0) + pids.reduce((s, p) => s + thick(p), 0);
+const footprint = (stacks, rot) => unary_union(stacks.flatMap(([dx, dy, pids, , srot]) => [...new Set(pids)].map(p => at(PACK_SHAPE[p], dx, dy, rot, 0, 0, srot || 0))));
 
 const placed = [];   // {name, pids, x, y, rot, z0, z1, fp, tier}
 const FLOOR = { name: 'floor', region: INTERIOR.buffer(-GAP_XY, { join_style: 'mitre' }), z0: 0.0, tier: 0 };
@@ -182,7 +205,7 @@ const STEP = 1.0;
 let contains_calls = 0;
 
 function try_shelf(col_pids, shelf) {
-  const h = Math.max(...col_pids.map(([, , pids]) => pids.reduce((s, p) => s + thick(p), 0))), z0 = shelf.z0, z1 = shelf.z0 + h;
+  const h = Math.max(...col_pids.map(stack_h)), z0 = shelf.z0, z1 = shelf.z0 + h;
   if (z1 > BUDGET_H + 1e-9) return null;
   const obst = placed.filter(q => q.z0 < z1 - 1e-9 && q.z1 > z0 + 1e-9).map(q => q.fp.buffer(GAP_XY));
   const free = obst.length ? shelf.region.difference(unary_union(obst)) : shelf.region;
@@ -199,7 +222,7 @@ function try_shelf(col_pids, shelf) {
       let x = fx0 - bx0;
       while (x + bx1 <= fx1 + 1e-9) {
         contains_calls++;
-        if (inside(fp0, gl, x, y) && (!shelf.balanced || col_pids.every(([dx, dy, ps]) => shelf.balanced(at(OUTLINES[ps[0]], dx, dy, rot, x, y))))) {
+        if (inside(fp0, gl, x, y) && (!shelf.balanced || col_pids.every(([dx, dy, ps, dz, srot]) => dz > 0 || shelf.balanced(at(OUTLINES[ps[0]], dx, dy, rot, x, y, srot || 0))))) {
           if (best === null || y < best[0] || (y === best[0] && x < best[1])) best = [y, x, rot];
           break;
         }
@@ -218,7 +241,7 @@ const failed = [];
 const FLAT_TOP = GP.flat_top || null;   /* id prefixes whose flat, regular tops can carry more piles; default: tiles, cards and boards */
 const flat_top = pid => FLAT_TOP ? FLAT_TOP.some(s => pid.startsWith(s)) : /^(tile|card|board)$/.test(kind_of(pid));
 const fixed_pile = (pids, x, y, z0, tier) => ({ pids, x, y, rot: 0, z0,
-  z1: z0 + Math.max(...pids.map(([, , ps]) => ps.reduce((s, p) => s + thick(p), 0))),
+  z1: z0 + Math.max(...pids.map(stack_h)),
   fp: affinity.translate(footprint(pids, 0), x, y), tier });
 const ctx1 = Object.assign(ctx0, { FLOOR, fixed_pile, try_shelf, shelves: () => shelves, addShelf: s => shelves.push(s), placed, GAP_XY, BUDGET_H });
 for (const [name, pids, pref] of columns) {
@@ -240,11 +263,11 @@ for (const [name, pids, pref] of columns) {
 // ------------------------------------------------------------------ independent verification, piece by piece
 const pieces = [];
 for (const q of placed) {
-  for (const [dx, dy, pids] of q.pids) {
-    let z = q.z0; const r = q.rot * Math.PI / 180, px = q.x + dx * Math.cos(r) - dy * Math.sin(r), py = q.y + dx * Math.sin(r) + dy * Math.cos(r);
+  for (const [dx, dy, pids, dz, srot, group] of q.pids) {
+    let z = q.z0 + (dz || 0); const r = q.rot * Math.PI / 180, px = q.x + dx * Math.cos(r) - dy * Math.sin(r), py = q.y + dx * Math.sin(r) + dy * Math.cos(r);
     for (const p of pids) {
-      const geom = at(OUTLINES[p], dx, dy, q.rot, q.x, q.y);
-      pieces.push({ pid: p, x: px, y: py, z, rot: q.rot, t: thick(p), geom, bb: geom.bounds, pile: q.name, pile_z0: q.z0 }); z += thick(p);
+      const geom = at(OUTLINES[p], dx, dy, q.rot, q.x, q.y, srot || 0);
+      pieces.push({ pid: p, x: px, y: py, z, rot: q.rot + (srot || 0), t: thick(p), geom, bb: geom.bounds, pile: q.name, pile_z0: q.z0, group: group || null }); z += thick(p);
     }
   }
 }
@@ -257,9 +280,9 @@ for (const pc of pieces) {
   if (!INTERIOR.contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the neck ring`);
   else { const d = pc.geom.distance(INT_EXT); if (d < GAP_XY - 1e-6) problems.push(`${pc.pid} (${pc.pile}) is ${d.toFixed(2)} mm from the neck`); }
   if (pc.z + pc.t > BUDGET_H + 1e-9) problems.push(`${pc.pid} (${pc.pile}) top ${(pc.z + pc.t).toFixed(1)} > ${BUDGET_H.toFixed(1)}`);
-  if (pc.z > 1e-9) {   // something must hold it up: its centroid over the pieces directly beneath (a frame's window or a standee's notch still holds the piece above)
-    const under = pieces.filter(o => Math.abs(o.z + o.t - pc.z) < 1e-6).map(o => o.hull || (o.hull = o.geom.convex_hull));
-    if (!under.length || !unary_union(under).buffer(0.01).contains(pc.geom.centroid)) problems.push(`${pc.pid} (${pc.pile}) at z ${pc.z.toFixed(1)} is unsupported`);
+  if (pc.z > 1e-9) {   // something must hold it up: its centroid inside the hull of the pieces directly beneath it that it touches (a frame's window or a standee's notch still holds the piece above; a tray rests on the pieces standing proud of the tray below)
+    const under = pieces.filter(o => Math.abs(o.z + o.t - pc.z) < 1e-6 && o.geom.distance(pc.geom) < 1e-6).map(o => o.hull || (o.hull = o.geom.convex_hull));
+    if (!under.length || !unary_union(under).convex_hull.buffer(0.01).contains(pc.geom.centroid)) problems.push(`${pc.pid} (${pc.pile}) at z ${pc.z.toFixed(1)} is unsupported`);
     /* a piece on the actual contact patches of what is under it (a frame's webs, a standee's silhouette) must have its centroid inside the contact's hull.
        The game's balance(pc, pieces, under) names the surfaces to test against (null: no test); the default tests every standing piece against everything under it */
     const under_geoms = () => pieces.filter(o => Math.abs(o.z + o.t - pc.z) < 1e-6).map(o => o.geom);
@@ -278,7 +301,7 @@ for (let i = 0; i < pieces.length; i++) {
       if (Math.hypot(gx, gy) >= GAP_XY) continue;   // the envelopes alone keep them apart
       const d = a.geom.distance(b.geom);
       // SVG arc flattening changes the measured edge distance by less than 0.005 mm.
-      const required = GP.clearance ? GP.clearance(a, b, GAP_XY) : GAP_XY;
+      const required = GP.clearance ? GP.clearance(a, b, GAP_XY) : (a.group && a.group === b.group ? POCKET_CLEARANCE - 0.05 : GAP_XY);   /* a piece in its pocket: the tray competency's 0.30 */
       if (d < required - 1e-6) problems.push(`${a.pid} (${a.pile}) and ${b.pid} (${b.pile}) are ${d.toFixed(6)} mm apart at z ${Math.max(a.z, b.z).toFixed(1)}`);
     }
   }
@@ -340,7 +363,7 @@ for (const tier of tiers) {
   const labels = [];
   placed.filter(q => q.tier === tier).forEach((q, k) => {
     const col = TAB20[k % 20];
-    for (const [dx, dy, pids] of q.pids) g.push(shape(unary_union([...new Set(pids)].map(pid => at(OUTLINES[pid], dx, dy, q.rot, q.x, q.y))), `fill="${col}" fill-opacity="0.85" stroke="black" stroke-width="0.6"`));
+    for (const [dx, dy, pids, , srot] of q.pids) g.push(shape(unary_union([...new Set(pids)].map(pid => at(OUTLINES[pid], dx, dy, q.rot, q.x, q.y, srot || 0))), `fill="${col}" fill-opacity="0.85" stroke="black" stroke-width="0.6"`));
     const c = q.fp.area < 1500 ? q.fp.representative_point() : q.fp.centroid, fs_ = q.fp.area < 1500 ? 8 : 10;
     labels.push(`<text x="${X(c.x).toFixed(1)}" y="${(Y(c.y) - fs_ * 0.15).toFixed(1)}" font-size="${fs_}" text-anchor="middle">${esc(q.name.trim())}</text>` +
       `<text x="${X(c.x).toFixed(1)}" y="${(Y(c.y) + fs_ * 1.05).toFixed(1)}" font-size="${fs_}" text-anchor="middle">${npcs(q)}x  z${q.z0.toFixed(1)}-${q.z1.toFixed(1)}</text>`);

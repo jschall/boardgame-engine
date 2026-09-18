@@ -18,6 +18,7 @@
     TAB_W: 18.0,         // floor tab length along the wall
     STANDEE_TAB: 10.0,   // a standee's tab width (the leaf-spring base slot is 9.50 finished: 0.25 mm interference a side)
     STAND_TAB: 10.0,     // a cross-lapped pair's tab width (+ hole)
+    XLAP_MIN_SLOT: 12.0, // each slot of a cross-lapped pair runs at least this far through its half (owner 2026-09-18): shorter, the halves rack and the joint works loose
     SPRING_SLIT: 0.8,    // slit up a tab
     SPRING_RAMP: 0.8,    // 30-degree lead-in on each bottom corner of a tab
     LEAF_SPAN: 8.0,      // the leaf spring's free span either side of the slot (owner's cut sweep: 8 / 9.50)

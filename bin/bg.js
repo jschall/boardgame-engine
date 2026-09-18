@@ -5,7 +5,7 @@
      node engine/bin/bg.js parts ['#t3lo=2.67&t3hi=2.92&kerf_t3=0.18'] [--out DIR] [--jobs N] [--no-cache]
                                                          parts/parts.json, parts/<sheet>.svg, manifest.json, parts/engraving_cache.json (exit 1 on any check)
      node engine/bin/bg.js stats [games]                 stats.json and showcase.json from self-play (the sim contract; a game with its own stats.js keeps it)
-     node engine/bin/bg.js balance [balance.js options]  seat wins, rounds, goals against the targets; --tune key=lo:hi:step
+     node engine/bin/bg.js balance [balance.js options]  seat wins, rounds, goals against the targets (game.json balance: {} sets them); --tune key=lo:hi:step; --gates the design gates
      node engine/bin/bg.js pack                          packing.json and pack/layer-N.png: every piece in the closed box (FITS, or exit 1)
      node engine/bin/bg.js jig [--no-render]             jig.json and parts/jig-sheet.svg: the box glue jig (and the game's jigs.js) with its FEM gate
      node engine/bin/bg.js page [--no-manual] [--no-geom] <slug>.html, the whole page
@@ -30,7 +30,9 @@ const commands = {
   doctor() { node(path.join(ENGINE, 'bin', 'doctor.js'), argv); },
   parts() { cfg(); node(path.join(ENGINE, 'src', 'cli.js'), argv); },
   stats() { const C = cfg(); node(has('stats.js') ? path.join(GAME_DIR, 'stats.js') : path.join(ENGINE, 'checks', 'stats.js'), (has('stats.js') ? [] : [C.sim]).concat(argv)); },   /* a game with its own showcase criteria keeps its stats.js */
-  balance() { const C = cfg(); node(path.join(ENGINE, 'checks', 'balance.js'), [C.sim].concat(argv)); },
+  balance() { const C = cfg(); const args = [];   /* game.json's balance: { rounds: '5:9', seat: 0.06, goals: '0.2:0.7', games: 400 } are the defaults the command line overrides */
+    for (const [k, v] of Object.entries(C.balance || {})) if (!argv.includes('--' + k)) args.push('--' + k, String(v));
+    node(path.join(ENGINE, 'checks', 'balance.js'), [C.sim].concat(args, argv)); },
   pack() { cfg(); node(path.join(ENGINE, 'src', 'pack.js'), argv); },
   jig() { cfg(); node(path.join(ENGINE, 'src', 'jig.js'), argv); },
   page() { cfg(); node(path.join(ENGINE, 'page', 'build.js'), argv); },
