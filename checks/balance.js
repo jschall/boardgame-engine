@@ -13,6 +13,7 @@
      strategies   { name: (g, rnd) => void }  turn functions for the current seat: the dumb players (onePiece, nearest, randomPlacement,
                   ignoreGoals, one per opt-in subsystem), `blind` (the AI with the opponents masked) and `obvious` (the greedy first-timer)
      archetypes   { name: (g, rnd) => void }  two or three full-strength styles that lean one way (racer, builder, blocker)
+   setup(g, rnd)  optional: what happens before the first turn (an opening round of placements)
    and its Game has .current and .over, so this harness can give one seat another player and let playTurn play the rest.
    Always reported: the midpoint leader's win rate and the last-round swing (the two feedback-loop numbers).
    --dumb   each strategy but blind/obvious takes one seat in turn at the fewest and the most players; its win rate against fair share (1 / players);
@@ -42,12 +43,13 @@ for (const k of ['RULES', 'playGame']) if (!(k in S)) throw new Error(`${file} d
 
 /* one game, turn by turn: seats in `seats` play their own strategy, the rest the sim's AI. `watch` sees the game at the start of every turn
    (for the midpoint leader and the last-round swing). Without strategies or a watcher the sim's own playGame runs (BUMBLE's has an opening). */
-const leader = g => { let best = -1, who = -1, tie = false; for (let c = 0; c < g.players; c++) { const t = g.score(c).total; if (t > best) { best = t; who = c; tie = false; } else if (t === best) tie = true; } return tie ? -1 : who; };
+const leader = (g, n) => { let best = -1, who = -1, tie = false; for (let c = 0; c < n; c++) { const t = g.score(c).total; if (t > best) { best = t; who = c; tie = false; } else if (t === best) tie = true; } return tie ? -1 : who; };
 function play(seed, players, opts, seats = {}, watch = null) {
   const rules = Object.keys(opts).length ? { rules: opts } : {};
   if (!Object.keys(seats).length && !watch) return S.playGame(seed, players, rules);
   if (!S.Game) throw new Error('the sim does not export Game: the gates need new Game({ players, seed, rules }), .current and .over (engine/README.md)');
   const g = new S.Game({ seed, players, rules: rules.rules }), rnd = S.mulberry(seed * 13 + 5); let guard = 0;
+  if (S.setup) S.setup(g, rnd);   /* the opening before the first turn (BUMBLE's opening plants) */
   while (!g.over && guard++ < 5000) { if (watch) watch(g); (seats[g.current] || S.playTurn)(g, rnd); }
   if (!g.over) throw new Error(`seed ${seed}, ${players} players: the game did not end (a loop or a stalemate)`);
   if (g.check) g.check(); return g;
@@ -57,7 +59,7 @@ function measure(players, opts) {
   const MID = Math.round((R0 + R1) / 4);   /* half the expected rounds */
   for (let i = 0; i < GAMES; i++) {
     let mid = null, last = null, lastRound = -1;
-    const g = play(1000 + i, players, opts, {}, S.Game && S.Game.prototype.score ? gg => { if (gg.current === 0) { if (gg.round === MID && mid === null) mid = leader(gg); if (gg.round !== lastRound) { lastRound = gg.round; last = leader(gg); } } } : null);
+    const g = play(1000 + i, players, opts, {}, S.Game && S.Game.prototype.score ? gg => { if (gg.round !== lastRound) { lastRound = gg.round; last = leader(gg, players); if (gg.round === MID && mid === null) mid = last; } } : null);   /* at each round's first turn (whoever starts it) */
     if (!g.over) throw new Error(`seed ${1000 + i}, ${players} players: the game did not end`);
     const { scores, winner } = g.final(); rounds += g.round; turns += g.log.length;
     if (winner < 0) ties++; else wins[winner]++;
