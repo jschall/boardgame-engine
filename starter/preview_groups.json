@@ -1,0 +1,1 @@
+{ "trees": { "match": ["tile-", "barn"], "scale": 5 }, "figures": { "match": ["farmer-", "crow", "scarecrow-", "base-"], "scale": 6 }, "tokens": { "match": ["token-", "basket-"], "scale": 6 }, "cards": { "match": ["order-"], "scale": 4 }, "box": { "ids": ["lid-outer", "lid-inner", "floor-base-under", "floor-base-map"], "scale": 3 } }

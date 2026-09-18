@@ -1,0 +1,15 @@
+node_modules/
+starter/parts/
+starter/pack/
+starter/preview/
+starter/manual/output/
+starter/manual/tmp/
+starter/manual/qa/
+starter/manual/rules-data.js
+starter/manual/assets/
+starter/*.html
+starter/packing.json
+starter/jig.json
+starter/stats.json
+starter/showcase.json
+starter/manifest.json

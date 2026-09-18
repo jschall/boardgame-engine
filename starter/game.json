@@ -1,0 +1,14 @@
+{
+  "name": "ORCHARD",
+  "slug": "orchard",
+  "sim": "orchard-sim.js",
+  "players": [2, 3, 4],
+  "minutes": "20 to 30",
+  "tagline": "Pick fruit, deliver orders, dodge the crow.",
+  "maker": "made on a laser",
+  "year": 2026,
+  "code": "",
+  "geom": "geom.js",
+  "geom_files": ["engine/lib/lasergeom.js", "engine/src/stock.js", "engine/src/shapes.js", "engine/src/box.js", "engine/src/geom.js", "orchard-sim.js", "rules.js", "art.js", "geom.js"],
+  "manual": { "pages": 12 }
+}

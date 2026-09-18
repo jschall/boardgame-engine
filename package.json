@@ -1,0 +1,15 @@
+{
+  "name": "boardgame-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The engine behind the boardgame-create skill: kerf-compensated laser cut files, the shoulder box and its glue jig, the packer, the self-contained page with its scroll-driven opening and self-playing table, the print rulebook, and the checks. A game is a folder with this repo as its engine/ submodule.",
+  "license": "MIT",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "playwright": "^1.63.0",
+    "sharp": "^0.35.4"
+  },
+  "scripts": {
+    "postinstall": "npx playwright install chromium"
+  }
+}

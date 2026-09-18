@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Booklet printing and finishing guides</title>
+<style>
+@font-face{font-family:Fredoka;src:url(assets/Fredoka-Medium.ttf);font-weight:400}
+@font-face{font-family:Fredoka;src:url(assets/Fredoka-SemiBold.ttf);font-weight:600}
+*{box-sizing:border-box}body{margin:0;color:#302219;font:400 10.5pt/1.25 Fredoka,sans-serif}
+@page{size:279.4mm 215.9mm;margin:0}.guide{position:relative;width:279.4mm;height:215.9mm;break-after:page}.guide:last-child{break-after:auto}
+header,footer{position:absolute;left:12mm;right:12mm}header{top:8mm}footer{top:184mm}p{margin:0 0 1.2mm}b{font-weight:600}
+.title{display:flex;justify-content:space-between;font-size:13pt;font-weight:600;margin-bottom:2mm}.sheet-label{font-size:10.5pt;padding-top:1mm}
+.marks{position:absolute;left:0;right:0;height:5mm;font-size:9pt;font-weight:600}.marks.top{top:33mm}.marks.bottom{top:179.5mm}.cut{position:absolute;left:28mm}.fold{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap}
+</style></head><body><main id="guides"></main><script>
+window.makeGuides=({pageCount,sheetCount,size,bleed})=>{
+ document.getElementById('guides').innerHTML=Array.from({length:sheetCount*2},(_,side)=>{
+  const sheet=Math.floor(side/2)+1,front=side%2===0;
+  const pair=front?[pageCount-2*(sheet-1),1+2*(sheet-1)]:[2+2*(sheet-1),pageCount-1-2*(sheet-1)];
+  return `<section class="guide"><header><div class="title"><span>BUMBLE &amp; BLOOM · Print &amp; finish</span><span class="sheet-label">Sheet ${sheet} of ${sheetCount} · ${front?'FRONT':'BACK'} · pages ${pair.join(' | ')}</span></div>
+  <p><b>US Letter · Landscape · Actual size (100%) · Duplex: flip on short edge.</b></p>
+  <p>Already imposed. Do not apply Booklet imposition, Fit or Scale to page.</p>
+  <p>Pair fronts and backs by sheet number. Sheet 1 is outermost; sheet ${sheetCount} is innermost.</p></header>
+  <div class="marks top"><span class="cut">CUT: TOP ARROW TIPS</span><span class="fold">FOLD AT CENTRE</span></div>
+  <div class="marks bottom"><span class="cut">CUT: BOTTOM ARROW TIPS</span><span class="fold">FOLD · DO NOT CUT</span></div>
+  <footer><p><b>FOLD &amp; NEST:</b> Fold each sheet at the centre marks. Put sheet 6 inside 5, then 4, 3, 2 and 1.</p>
+  <p><b>STAPLE:</b> Staple through the fold. <b>TRIM:</b> Cut head and foot through the paired arrow tips.</p>
+  <p>Trim the fore-edge ${size} mm from the fold. Keep the fold uncut. Finished size: <b>${size} × ${size} mm.</b></p>
+  <p>The extra ${bleed} mm of cream is bleed. Cut at the marks; these instructions are trimmed away.</p></footer></section>`;
+ }).join('');
+};
+</script></body></html>

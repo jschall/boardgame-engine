@@ -1,0 +1,32 @@
+/* These rules only present the generated paper pages; typography lives in the manual. */
+.manual-reader { border-radius:16px; background:#e6d7b9; padding:18px 16px 28px; outline-offset:5px; }
+.manual-toolbar { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.manual-toolbar button, .manual-toolbar select { font:600 16px/1.2 Fredoka, sans-serif; color:var(--ink); background:#fffaf0; border:1px solid #a58a59; border-radius:8px; padding:10px 14px; cursor:pointer; }
+.manual-toolbar button:disabled { opacity:.4; cursor:default; }
+.manual-toolbar button:focus-visible, .manual-toolbar select:focus-visible { outline:3px solid var(--honey-d); outline-offset:3px; }
+.manual-jump { display:flex; align-items:center; gap:6px; }
+#manual-indicator { min-width:100px; text-align:center; font-size:15px; }
+#manual-help { text-align:center; color:#63513d; font-size:14px; margin:12px 0 16px; }
+#manual-stage { position:relative; width:100%; overflow:hidden; touch-action:pan-y pinch-zoom; }
+#book { position:absolute; left:50%; top:48px; width:360mm; height:180mm; margin:0; background:transparent; perspective:5000px; transform-origin:top center; transform:translateX(calc(-50% + var(--book-shift, 0px))) scale(var(--book-scale, 1)); transition:transform .65s ease; isolation:isolate; }
+#book.single { width:180mm; }
+#book .manual-leaf { position:absolute; width:180mm; height:180mm; top:0; left:180mm; transform-origin:left center; transform-style:preserve-3d; }
+#book.single .manual-leaf { left:0; }
+#book .sheet, #book .manual-verso { position:absolute; inset:0; width:180mm; height:180mm; margin:0; padding:0; border:0; border-radius:0 2px 2px 0; background:var(--paper); backface-visibility:hidden; box-shadow:0 2px 3px #38260940, 0 8px 18px #38260924; overflow:hidden; }
+#book .manual-back { transform:rotateY(180deg); border-radius:2px 0 0 2px; }
+#book .page { left:0; top:0; }
+#book .bleed { inset:0; }
+#book .sheet::after, #book .manual-verso::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
+#book .manual-back::after { background:linear-gradient(270deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
+#book .manual-leaf.turning::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,#3a260844,transparent 35%); opacity:var(--turn-shade, 0); pointer-events:none; transform:translateZ(.2px); }
+#book a:focus-visible { outline:2px solid var(--honey); outline-offset:2px; }
+#book img { -webkit-user-drag:none; }
+.manual-reader.dragging { user-select:none; cursor:grabbing; }
+@media (max-width:600px) {
+  .manual-reader { padding:14px 6px; margin:0 -12px; }
+  .manual-toolbar { gap:8px; }
+  .manual-toolbar button, .manual-toolbar select { font-size:14px; padding:9px; }
+  #manual-indicator { min-width:76px; font-size:13px; }
+  #manual-help { font-size:13px; }
+}
+@media (prefers-reduced-motion:reduce) { #book { transition:none; } }

@@ -1,0 +1,6 @@
+[
+  {"name": "table, unstarted", "hash": "#shot=table", "wait": 3000, "inventory": true},
+  {"name": "table, 12 turns in", "hash": "#shot=table&anim=12&speed=16", "anim": 12, "inventory": false},
+  {"name": "orchard view", "hash": "#shot=parts&id=view-orchard", "wait": 3000, "inventory": false},
+  {"name": "barn assembly", "hash": "#shot=parts&id=asm-barn", "wait": 3000, "inventory": false}
+]
