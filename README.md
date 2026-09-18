@@ -5,10 +5,18 @@ Everything hard about producing a laser-cut board game, in one repository a game
 - **the cut files**: kerf-compensated outlines and engraving on 300 × 450 mm sheets, from measured stock (two caliper readings and a kerf per stock), with standee tabs, keyed leaf-spring bases, + holes for cross-lapped pairs, shared cut lines, registration crosses, edge scores, vector fill, the kerf coupons and joint samples, the backs files (`src/geom.js`, `src/shapes.js`, `src/stock.js`, `lib/lasergeom.js`);
 - **the shoulder box**: two trays from one frame (the lid roomier than the base), a symmetric neck, thumb notches, the lid top with a medallion, the title ribbon and the choking warning, the rules inside the lid, the setup map inside the base, the medallion and product code under it (`src/box.js`), and **its glue jig** with sixteen torsion-bar spring stations and a working-stress gate (`src/jig.js`, `src/jig_mech.js`);
 - **the packer**: every piece into the closed box, verified as prisms (`src/pack.js`);
-- **the page**: one self-contained HTML file with a scroll-driven 3D opening of the box, a table that plays the game by itself, a parts viewer with assemblies, the rulebook as a page-turning book, the laser files with a stock panel that regenerates them in a worker (`page/`, `lib/render3d.js`);
+- **the page**: one self-contained HTML file whose one button opens the box in 3D, every piece flying to its place, a table that plays the game by itself, a parts viewer with assemblies, the rulebook as a page-turning book, the laser files with a stock panel that regenerates them in a worker (`page/`, `lib/render3d.js`);
 - **the print rulebook**: a press PDF and a US Letter booklet from the game's HTML, its figures from the real cut files (`manual/`);
 - **the checks**: lint, fit (interference in every scene at both ends of the stock range), balance, the page gates, intersections in the live page, the animation, the opening (`checks/`);
 - **the CLI**: `node engine/bin/bg.js <parts|stats|balance|pack|jig|page|manual|lint|fit|check|all|new|doctor>`.
+
+**The skill.** `plugins/boardgame-create` is the Claude Code plugin that drives all of this from one prompt ("recreate Catan for my laser"): the `boardgame-create` skill (workflow, standards, design procedure, judge templates) and the `fable-reviewer` agent. Install it in Claude Code with
+
+```
+/plugin install boardgame-create --marketplace jschall/boardgame-engine
+```
+
+(or `/plugin marketplace add jschall/boardgame-engine` then `/plugin install boardgame-create@boardgame-engine`); this repository is the marketplace (`.claude-plugin/marketplace.json`). Without the plugin system, copy `plugins/boardgame-create/skills/boardgame-create` into `~/.claude/skills/`.
 
 BUMBLE & BLOOM (`~/junk/boardgame/bumble`) is the first game on it and the reference: everything here was cut and validated on its wood. ORCHARD (`starter/`) is a complete small game every new game begins as.
 
@@ -69,3 +77,9 @@ It returns, required: `NP` (seats on the table, 4), `players [{ name, colour, ti
 
 ## Keeping the engine current
 `tools/split_bumble_page.py <bumble page.js> <engine> <bumble>` re-splits BUMBLE's page.js into `page/page.js` and BUMBLE's `table.js` when the stage machinery improves there. `lib/lasergeom.js` is built in `~/junk/boardgame/common/lasergeom` (`node build.mjs`) and `lib/render3d.js` is `common/render3d.js`.
+
+## License
+
+boardgame-engine is free software under the GNU General Public License, version 3 or (at your option) any later version: see `LICENSE`. Copyright (C) 2026 Jonathan Challinger. The `boardgame-create` skill in `plugins/` is part of it. A page built with `bg page` embeds the engine's JavaScript, so a published page is a GPL work too: keep the game's source (its folder, with `engine/` as the submodule) available with it.
+
+Third-party components with their own licenses: `lib/lasergeom.js` bundles JSTS (EPL-2.0 / EDL-1.0) and opentype.js (MIT); `fonts/` carries Fredoka under the SIL Open Font License 1.1 (`fonts/OFL.txt`). `npm install` brings playwright, sharp and pdf-lib under their own licenses.
