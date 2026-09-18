@@ -42,7 +42,9 @@ Coordinates: **the world basis is left-handed** (x right, y toward the viewer, z
 
 Procedural veneer tiles (2048 px = 300 mm for birch and walnut; a normal map from the same height field) are generated once in a web worker (~1.2 s) and swapped in over a flat swatch: `Render3D.prepareTextures()` returns the promise; wait for it before the first screenshot. `#…&sync=1` in the hash generates on the main thread (headless virtual-time runs cannot wait for a worker). The table blends two rotated copies under a slow mask so the big quad never shows a repeat. `scene.setTexture(kind, img)` overrides with a photo (no normal map).
 
-Owner's texture rules: one scale for every wood part; never visibly repetitive; lighter and finer than you think; the tabletop disappears when the camera goes below z = 0 so the underside engraving is visible.
+Owner's texture rules: one scale for every wood part; never visibly repetitive; lighter and finer than you think; the tabletop disappears when the camera goes below z = 0 so the underside engraving is visible, and so do the contact shadows (they lie on the table; from below they floated in the dark).
+
+The owner's woods, matched on 2026-09-18 against the cut game: walnut is a grey-brown (`WOODP.walnut.col` 118/97/80 to 74/58/46), not orange. Engraving on walnut keeps the grain, a little darker and redder, and shines: `WOODP.walnut.eng = { tint: [0.80, 0.60, 0.54], spec: 0.45 }` drives the shader's uEngMode/uEngTint/uEngSpec (the decal's alpha masks a tint of the wood colour and an extra specular term); a wood without `eng` chars dark (the decal's own colour, `BURN`). Every cut edge is a charred dark brown on any wood (`EDGE`), the ply layers faint under the char. `ENGRAVED` (woods that engrave paler than their face) is empty; do not bring the pale walnut mark back.
 
 ## Decals
 
