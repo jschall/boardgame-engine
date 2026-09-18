@@ -129,14 +129,14 @@
   }
   /** every card's back: the same tree in a frame, so no back tells a card apart */
   function card_back() { return memo('orchard:card_back', () => finish(unary_union([outline(rrect(3, 3, CARD_W - 3, CARD_H - 3, 3), 0.6), outline(rrect(5.5, 5.5, CARD_W - 5.5, CARD_H - 5.5, 2), 0.35), tree(CARD_W / 2, CARD_H / 2 - 2, 1.5, 'apple', 7), ink('ORCHARD', 4.0, CARD_W / 2, CARD_H - 9, { font: FONT.B, spacing: 0.9 })]), K.card(CARD_W, CARD_H), 1.0)); }
-  /** a basket board: four rings for the fruit a farmer carries, the seat's colour name */
+  /** a basket's pocket layer: the seat's dots and colour name along the top margin, above the four pockets (the engine cuts them: 16.6 mm round
+   *  the 16 mm tokens at x -30..30 step 20, y 2, and gives the tray a 6 mm margin, so the layer is about 93 x 29 mm with its top edge at y -12.3) */
   function basket_art(seat) {
     return memo('orchard:basket:' + seat, () => {
-      const P = S.PLAYERS[seat], shape = K.plate(BASKET_W, BASKET_H, 3.0), g = [outline(rrect(-BASKET_W / 2 + 2, -BASKET_H / 2 + 2, BASKET_W / 2 - 2, BASKET_H / 2 - 2, 2), 0.5)];
-      for (let i = 0; i < S.RULES.basket; i++) { const x = -27 + i * 18; g.push(C(x, 1.5, 9.0, 32).difference(C(x, 1.5, 8.3, 32))); }
-      for (let i = 0; i < seat + 1; i++) g.push(C(-34 + i * 2.6, -10.5, 0.7, 8));
-      g.push(ink(`${P.name.toUpperCase()} · ${P.key.toUpperCase()}`, 2.6, 12, -9.6, { font: FONT.SB, spacing: 0.4 }));
-      return finish(unary_union(g), shape, 1.0);
+      const P = S.PLAYERS[seat], g = [];
+      for (let i = 0; i < seat + 1; i++) g.push(C(-40 + i * 2.6, -9.6, 0.7, 8));
+      g.push(ink(`${P.name.toUpperCase()} · ${P.key.toUpperCase()} · BASKET`, 2.4, 14, -8.7, { font: FONT.SB, spacing: 0.4 }));
+      return unary_union(g);
     });
   }
   /** a base: the seat's number of dots on two edges (a keyed base for a keyed farmer) */

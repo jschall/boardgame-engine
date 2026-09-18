@@ -23,6 +23,8 @@ const git = (args, cwd) => { const r = spawnSync('git', args, { cwd: cwd || DIR,
 /* the engine: a submodule of the given url or path, else of this engine's origin, else of this engine's folder */
 let origin = engineArg;
 if (!origin) { const r = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: ENGINE, encoding: 'utf8' }); origin = r.status === 0 && r.stdout.trim() ? r.stdout.trim() : ENGINE; }
+/* a GitHub SSH origin becomes the https URL, which any machine can clone without keys */
+{ const m = origin.match(/^git@github\.com:(.+?)(?:\.git)?$/); if (m) origin = `https://github.com/${m[1]}`; }
 /* the starter, renamed */
 const SRC = path.join(ENGINE, 'starter');
 const copy = (from, to) => { for (const f of fs.readdirSync(from)) { const s = path.join(from, f), d = path.join(to, f); if (fs.statSync(s).isDirectory()) { fs.mkdirSync(d, { recursive: true }); copy(s, d); } else fs.copyFileSync(s, d); } };

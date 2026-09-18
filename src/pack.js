@@ -92,6 +92,10 @@ function default_columns() {
   const sig = pid => { const b = OUTLINES[pid].bounds; return [Math.round(b[2] - b[0]), Math.round(b[3] - b[1])].join('x'); };
   /* pieces of one kind and size stack together: boards on the floor, tiles in even stacks, cards in one stack, tokens by kind, standing pieces and bases flat in the gaps */
   const bySig = pids => { const m = new Map(); for (const p of pids) { const k = sig(p); if (!m.has(k)) m.set(k, []); m.get(k).push(...take(p, inventory[p])); } return [...m.entries()]; };
+  /* laminated trays pack as themselves, the frame on its back; trays of one outline stack in one pile, as many as the box's height takes */
+  { const stacks = new Map();
+    for (const pid of by.tray || []) { const n = inventory[pid], frame = inventory[pid + '-frame'] ? take(pid + '-frame', n) : [], backs = take(pid, n); const k = sig(pid); if (!stacks.has(k)) stacks.set(k, []); for (let i = 0; i < n; i++) stacks.get(k).push(backs[i], ...(frame[i] ? [frame[i]] : [])); }
+    for (const [k, pids] of stacks) { const per = Math.max(1, Math.floor(BUDGET_H / pids.reduce((a, p) => a + thick(p), 0) * pids.length)); chunk(`trays ${k}`, pids, per, 'floor'); } }
   for (const [k, pids] of bySig(by.board || [])) chunk(`boards ${k}`, pids, fits(pids), 'floor');
   for (const [k, pids] of bySig(by.tile || [])) chunk(`tiles ${k}`, pids, fits(pids), 'floor');
   for (const [k, pids] of bySig(by.card || [])) chunk(`cards ${k}`, pids, fits(pids), 'any');

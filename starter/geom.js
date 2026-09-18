@@ -20,7 +20,9 @@
     const key = 2.0 + seat * 1.5;   /* the gap in the tab, mm from its left edge: only the base with the matching bridge takes this farmer */
     parts.push({ id: `farmer-${P.key}`, kind: 'standee', count: 1, stock: 't3', in: 't3', silhouette: A.SIL.farmer, art: () => A.farmer_art(seat), key, base: `base-${P.key}`, name: `${P.key} farmer` });
     parts.push({ id: `base-${P.key}`, kind: 'base', count: 1, stock: 't3', holds: 't3', shape: 'circle', size: 18, key, art: () => A.base_art(seat), name: `${P.key} base` });
-    parts.push({ id: `basket-${P.key}`, kind: 'board', count: 1, stock: 't3', shape: K.plate(A.BASKET_W, A.BASKET_H, 3.0), art: () => A.basket_art(seat), name: `${P.key} basket board` });
+    /* the basket: a tray with a pocket per fruit the farmer may carry. The engine cuts the pockets out of the 1.5 mm stock (0.3 mm round each token) and
+       laminates it on this 3 mm back, so a token stands 1.5 mm proud and lifts out easily; the seat's name is engraved on the back's bare margin */
+    parts.push({ id: `basket-${P.key}`, kind: 'tray', count: 1, stock: 't3', pockets: [0, 1, 2, 3].map(i => ({ piece: 'token-apple', x: -30 + i * 20, y: 2 })), margin: 6, frame_art: () => A.basket_art(seat), name: `${P.key} basket` });
   });
   parts.push({ id: 'crow', kind: 'standee', count: 1, stock: 't3', in: 't3', silhouette: A.SIL.crow, art: () => A.crow_art(), base: 'base-crow', name: 'crow' });
   parts.push({ id: 'base-crow', kind: 'base', count: 1, stock: 't3', holds: 't3', shape: 'oct', size: 20, art: null, name: 'crow base' });

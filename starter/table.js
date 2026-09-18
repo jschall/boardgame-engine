@@ -21,7 +21,8 @@ function GameTable(api) {
   const seatDeg = c => seatAng(c) * 180 / Math.PI + 90;
   const seatW = (c, u, v) => { const a = seatAng(c); const [rx, ry] = rotXY(seatDeg(c), u, v); return [Math.cos(a) * SEAT_R + rx, Math.sin(a) * SEAT_R + ry]; };
   const baskets = [];
-  for (let c = 0; c < NP; c++) { const inst = mk({ part: part('basket-' + S.PLAYERS[c].key) }); const [x, y] = seatW(c, 0, 0); setPose(inst, [0, 0], x, y, 0, seatDeg(c)); T.static.push(inst); baskets.push(inst); }
+  for (let c = 0; c < NP; c++) { const k = S.PLAYERS[c].key, [x, y] = seatW(c, 0, 0); const back = mk({ part: part('basket-' + k) }); setPose(back, [0, 0], x, y, 0, seatDeg(c)); T.static.push(back); baskets.push(back);
+    if (PARTS['basket-' + k + '-frame']) { const fr = mk({ part: part('basket-' + k + '-frame') }); setPose(fr, [0, 0], x, y, 0, seatDeg(c)); posed(fr, () => ({ z: STOCK_T(stockOf('basket-' + k)) })); T.static.push(fr); } }
   /* the barn with the scarecrow beyond the far corner, the market (three cards) beside it */
   const BARN = [-230, -235];
   const barn = mk({ part: part('barn'), x: BARN[0], y: BARN[1], z: 0 }); T.static.push(barn, ...standingPair('scarecrow-a', 'scarecrow-b', BARN[0], BARN[1], 0, 'barn'));
@@ -47,7 +48,9 @@ function GameTable(api) {
   /* a farmer stands to the right of the tree's centre, the crow to the left, so two standing pieces on one tree never touch */
   const farmerXY = t => { const [x, y] = treeXY(t); return [x + 9, y + 9]; };
   const crowXY = t => { const [x, y] = treeXY(t); return [x - 10, y - 9]; };
-  const basketXY = (c, j) => { const [x, y] = seatW(c, -27 + j * 18, 1.5); return [x, y, STOCK_T('t3'), seatDeg(c)]; };
+  /* a fruit in its pocket: the basket tray's pockets (META.trays) in the seat's frame, on the tray's back */
+  const TRAY = need(need(META, 'trays', 'META'), 'basket-red', 'META.trays');
+  const basketXY = (c, j) => { const q = TRAY.pockets[j]; const [x, y] = seatW(c, q.x, q.y); return [x, y, STOCK_T(TRAY.back), seatDeg(c)]; };
 
   /* ------------------------------------------------------------ the assemblies and views the parts list offers */
   addAsm('asm-barn', 'Assemblies', 'The scarecrow in the barn', 'Two halves cross-lap at mid-height and stand in the + hole in the barn tile, held by its four leaf springs. Explode lifts the halves apart.', 'scarecrow-a',
@@ -58,7 +61,7 @@ function GameTable(api) {
   const groups = [
     ['Trees and the barn', FRUIT.map(f => 'tile-' + f).concat(['barn'])],
     ['Standing pieces', S.PLAYERS.map(p => 'farmer-' + p.key).concat(['crow', 'scarecrow-a', 'scarecrow-b'])],
-    ['Bases, baskets and tokens', S.PLAYERS.map(p => 'base-' + p.key).concat(['base-crow'], S.PLAYERS.map(p => 'basket-' + p.key), FRUIT.map(f => 'token-' + f))],
+    ['Bases, baskets and tokens', S.PLAYERS.map(p => 'base-' + p.key).concat(['base-crow'], S.PLAYERS.flatMap(p => ['basket-' + p.key, 'basket-' + p.key + '-frame']), FRUIT.map(f => 'token-' + f))],
     ['Order cards', S.ORDERS.map((o, i) => 'order-' + i)],
   ];
 

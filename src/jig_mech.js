@@ -78,7 +78,8 @@ function use(jig){J=jig;}
 function calibration(tray) {
   const j=J,d=j.parameters(tray),key=JSON.stringify([tray.stock,d]);
   if(calibrationCache.has(key))return calibrationCache.get(key);
-  const ref=j.build(tray,{...d,barWidth:observation.barWidth,barLength:observation.barLength});
+  // the observed jig: the cut bars and its pads 20..22 mm up a 24 mm wall, whatever the jig being designed has (a lower pad on a short wall)
+  const ref=j.build({...tray,height:Math.max(tray.height,24)},{...d,barWidth:observation.barWidth,barLength:observation.barLength,padLow:20,padHigh:22});
   const cases=[];
   for(const t of tray.stock) {
     const seat=j.seatedInsert(ref,t);

@@ -27,6 +27,9 @@
     BASE_END_WOOD: 3.0, LEAF_ANCHOR: 1.50,
     KEY_BRIDGE: 1.50, KEY_GAP: 1.80, KEY_HEADROOM: 1.0,   // a keyed tab: a gap in the tab and a bridge across the slot that only the right key clears
     JIG_CL: 0.07,
+    POCKET_CLEARANCE: 0.30,   // a piece in a pocket or well: this much bare wood round it (owner, 2026-09-18: "the token-pocket clearance shall be 0.3mm")
+    POCKET_PROUD: 1.0,        // a piece must stand at least this far above its pocket's rim to be picked up easily, else the pocket gets a finger notch
+    NOTCH_R: 6.0,             // the finger notch: a half-round this big cut into the pocket's rim
   });
   /** the clearance table (mm): each value is a design decision recorded with its source; do not tune */
   const FIT = Object.freeze({
@@ -44,7 +47,7 @@
     base_ease: 0.10,       // the base tray is drawn INNER + 2 base_ease inside (owner 2026-09-17: the neck goes in a little easier)
     lid_ease: 0.50,        // the lid tray is drawn INNER + 2 lid_ease inside (owner 2026-09-17: the lid slides over the neck with room)
     neck_finger_under: 0.07,   // neck finger length = t_min - this: no finger stands past the board it meets
-    well: 1.00,            // a drop-in well = the token + this across flats
+    well: 0.60,            // a drop-in well = the token + this across flats (0.30 a side, the pocket clearance)
     min_width: 2.0, min_projection: 1.0,   // no load-bearing feature narrower or shorter than this: the beam cannot reproduce ribs
   });
 
@@ -76,6 +79,7 @@
     const B = S[box.stock], N = S[neckKey], D = DESIGN, INNER = box.inner;
     if (!(INNER >= 80 && INNER <= 400)) throw new Error(`box.inner must be 80 to 400 mm, got ${INNER}`);
     const WALL_H = box.wall_h || D.WALL_H;
+    if (!(WALL_H >= 24 && WALL_H <= 40)) throw new Error(`box.wall_h must be 24 to 40 mm, got ${WALL_H}: the glue jig's springs bear 20 to 22 mm up the wall and were validated at 24 (a shorter wall overstresses them)`);
     const WALL_T = B.t + FIT.finger, OUT = INNER + 2 * WALL_T;
     const NECK_H = 2 * WALL_H + D.GAP - 2 * (D.FLOOR_UP + B.t);
     const WALL_SLOT_H = B.t + FIT.slot;

@@ -11,7 +11,7 @@
   const lg = K.lg;
   const { Polygon, sbox, unary_union, affinity, EMPTY, polys, hexagon, C, rrect, memo, range, FONT, ink } = K;
   const SHEET_W = 300.0, SHEET_H = 450.0, TOP = 3.0;
-  const KINDS = ['tile', 'token', 'card', 'board', 'plate', 'standee', 'base', 'pair'];
+  const KINDS = ['tile', 'token', 'card', 'board', 'plate', 'standee', 'base', 'pair', 'tray'];
 
   /** check and complete a game's parts spec (the object parts.js returns) */
   function normalize(spec) {
@@ -22,7 +22,8 @@
     const ids = new Set(), out = [];
     for (const p of spec.parts) {
       if (!p.id || !/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(p.id)) throw new Error(`part id ${JSON.stringify(p.id)}: lower-case words joined by hyphens`);
-      if (/-back$/.test(p.id) || /-(a|b)$/.test(p.id) && p.kind !== 'pair') throw new Error(`part ${p.id}: ids ending in -back are the engine's`);
+      if (/-back$|-frame$/.test(p.id)) throw new Error(`part ${p.id}: ids ending in -back or -frame are the engine's (a back face, a tray's pocket layer)`);
+      { const m = p.id.match(/^(.*)-(a|b)$/); if (m && spec.parts.some(q => q.kind === 'pair' && q.id === m[1])) throw new Error(`part ${p.id}: the pair ${m[1]} owns ${m[1]}-a and ${m[1]}-b`); }
       if (ids.has(p.id)) throw new Error(`part ${p.id} is listed twice`); ids.add(p.id);
       if (!KINDS.includes(p.kind)) throw new Error(`part ${p.id}: kind ${p.kind} is not one of ${KINDS.join(', ')}`);
       if (!Number.isInteger(p.count) || p.count < 1) throw new Error(`part ${p.id}: count must be a whole number of copies`);
@@ -36,12 +37,17 @@
       } else if (p.kind === 'pair') {
         if (!p.silhouette || !p.silhouette.geom_type) throw new Error(`pair ${p.id}: silhouette must be a lasergeom polygon`);
         if (!p.in || !spec.stocks[p.in]) throw new Error(`pair ${p.id}: in = the stock key of the tile with the + hole`);
+      } else if (p.kind === 'tray') {
+        if (!Array.isArray(p.pockets) || !p.pockets.length) throw new Error(`tray ${p.id}: pockets = [{ piece | shape, x, y, rot, notch }]`);
+        for (const q of p.pockets) if (!(q.piece && typeof q.piece === 'string') && !(q.shape && q.shape.geom_type)) throw new Error(`tray ${p.id}: each pocket names a piece (its id) or gives a shape`);
+        if (p.frame !== undefined && p.frame !== null && !spec.stocks[p.frame]) throw new Error(`tray ${p.id}: frame ${p.frame} is not a stock`);
       } else if (!p.shape || !p.shape.geom_type) throw new Error(`part ${p.id}: shape must be a lasergeom polygon`);
       if (p.art !== undefined && p.art !== null && typeof p.art !== 'function') throw new Error(`part ${p.id}: art must be a function drawing the engraving (or null)`);
       if (p.back !== undefined && p.back !== null && typeof p.back !== 'function' && p.back !== true) throw new Error(`part ${p.id}: back must be a function, true (the front mirrored) or null`);
       out.push(Object.assign({ art: null, back: null, name: p.id.replace(/-/g, ' ') }, p));
     }
     for (const p of out) if (p.kind === 'tile' && p.plus) { if (!out.find(q => q.id === p.plus.pair && q.kind === 'pair')) throw new Error(`tile ${p.id}: plus.pair names no pair`); }
+    for (const p of out) if (p.kind === 'tray') for (const q of p.pockets) if (q.piece) { const t = out.find(r => r.id === q.piece); if (!t) throw new Error(`tray ${p.id}: pocket piece ${q.piece} is not a part`); if (!t.shape) throw new Error(`tray ${p.id}: pocket piece ${q.piece} has no flat shape (a standee stands in a base, not a pocket)`); }
     return Object.assign({}, spec, { parts: out });
   }
 
@@ -55,6 +61,7 @@
       const n = BOX.NEED();
       for (const p of spec.parts) {
         if (p.kind === 'pair') { n[`${p.id}-a`] = p.count; n[`${p.id}-b`] = p.count; } else n[p.id] = p.count;
+        if (p.kind === 'tray' && p.frame !== null) { const thinner = Object.keys(spec.stocks).filter(k => k !== p.stock && spec.stocks[k].nominal < 0.75 * Math.min(...p.pockets.map(q => q.piece ? spec.stocks[spec.parts.find(r => r.id === q.piece).stock].nominal : (q.t || spec.stocks[p.stock].nominal)))); if (p.frame || thinner.length) n[`${p.id}-frame`] = p.count; }
       }
       return n;
     };
@@ -88,7 +95,7 @@
           return true;
         };
         const mirrored = shape => K.back_art(shape, shape);
-        const bases = {}, part_kind = {}, part_name = {}, part_key = {}, standee_of = {};
+        const bases = {}, part_kind = {}, part_name = {}, part_key = {}, standee_of = {}, trays = {};
         // ------------------------------------------------------------ the game's parts
         step('parts', 0.02);
         const flat = (p) => {
@@ -120,6 +127,43 @@
           const registered = keyed(p.id, whole, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: whole, eng_post: g => K.clip_out(g, site.removed.buffer(0.6), 0.6, 1.2), eng_post_key: 'leaf:' + [fs.slot_len, fs.slot_w, kerf_of(p.id), p.key].join(',') });
           if (registered) K.leaf_part(lay, p.id, whole, site);
         };
+        /* a tray with pockets for pieces (the tray competency). Pocket = the piece's outline plus POCKET_CLEARANCE all round. With a thin stock in
+           the game the pockets are cut out of it (the frame) and laminated on a back (p.stock: thin or thick, the author's choice of material use);
+           a piece must stand POCKET_PROUD above the frame or the pocket gets a finger notch. With no thinner stock the pockets are engraved into the
+           tray (one part; the laser's engraving depth is the pocket depth, so every piece stands proud). */
+        const tray = (p) => {
+          const D = K.DESIGN, pieceOf = q => q.piece ? spec.parts.find(r => r.id === q.piece) : null;
+          const pieceShape = q => q.piece ? pieceOf(q).shape : q.shape, pieceT = q => q.piece ? F.stocks[pieceOf(q).stock].t : (q.t || F.stocks[p.stock].t);
+          const thinner = Object.keys(stocks).filter(k => k !== p.stock && stocks[k].nominal < 0.75 * Math.min(...p.pockets.map(pieceT))).sort((a, b) => stocks[a].nominal - stocks[b].nominal);
+          const frame = p.frame === null ? null : p.frame !== undefined ? p.frame : (thinner[0] || null);
+          const pockets = p.pockets.map((q, i) => {
+            const sh = affinity.translate(affinity.rotate(pieceShape(q), q.rot || 0, [0, 0]), q.x || 0, q.y || 0), b = sh.bounds;
+            const hole = sh.buffer(D.POCKET_CLEARANCE, { join_style: 'round', quad_segs: 6 });
+            const proud = pieceT(q) - (frame ? F.stocks[frame].t : 0);
+            const side = q.notch === undefined ? ((b[2] - b[0]) >= (b[3] - b[1]) ? 'S' : 'E') : q.notch;   /* the notch on the pocket's longer side */
+            const notch = frame && proud < D.POCKET_PROUD && side ? C(side === 'S' ? (b[0] + b[2]) / 2 : side === 'N' ? (b[0] + b[2]) / 2 : side === 'E' ? b[2] + D.POCKET_CLEARANCE : b[0] - D.POCKET_CLEARANCE, side === 'S' ? b[3] + D.POCKET_CLEARANCE : side === 'N' ? b[1] - D.POCKET_CLEARANCE : (b[1] + b[3]) / 2, D.NOTCH_R, 16) : null;
+            return { i, piece: q.piece || null, x: q.x || 0, y: q.y || 0, rot: q.rot || 0, hole, notch, proud, bounds: hole.bounds, w: +(b[2] - b[0]).toFixed(2), h: +(b[3] - b[1]).toFixed(2) };
+          });
+          const hb = pockets.map(q => q.notch ? q.hole.union(q.notch).bounds : q.bounds), M = p.margin || 6;
+          const x0 = Math.min(...hb.map(b => b[0])) - M, y0 = Math.min(...hb.map(b => b[1])) - M, x1 = Math.max(...hb.map(b => b[2])) + M, y1 = Math.max(...hb.map(b => b[3])) + M;
+          const outer = p.shape || rrect(x0, y0, x1, y1, p.r || 3.0);
+          for (const q of pockets) if (outer.buffer(-2.0).contains(q.hole) === false) throw new Error(`tray ${p.id}: pocket ${q.i} comes within 2 mm of the tray's edge`);
+          for (let a = 0; a < pockets.length; a++) for (let b = a + 1; b < pockets.length; b++) if (pockets[a].hole.distance(pockets[b].hole) < 2.0) throw new Error(`tray ${p.id}: pockets ${a} and ${b} leave less than 2 mm of wood between them`);
+          const holes = unary_union(pockets.map(q => q.notch ? q.hole.union(q.notch) : q.hole));
+          part_name[p.id] = p.name; setStock(p.id, p.stock);
+          if (frame) {   /* the back (p.stock) with the tray's art, the frame (thin) with the pockets cut out */
+            part_kind[p.id] = 'tray'; part_kind[p.id + '-frame'] = 'tray-frame'; part_name[p.id + '-frame'] = `${p.name}, pocket layer`; setStock(p.id + '-frame', frame);
+            keyed(p.id, outer, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: outer });
+            const frameShape = outer.difference(holes);
+            if (frameShape.geom_type !== 'Polygon') throw new Error(`tray ${p.id}: the pockets cut the frame into pieces`);
+            keyed(p.id + '-frame', frameShape, `part:${p.id}:frame`, () => p.frame_art ? p.frame_art() : EMPTY, { edge: outer });
+          } else {   /* one part: the pockets engraved */
+            part_kind[p.id] = 'tray';
+            keyed(p.id, outer, `part:${p.id}`, () => unary_union([holes, p.art ? p.art() : EMPTY]), { edge: outer });
+          }
+          trays[p.id] = { w: +(outer.bounds[2] - outer.bounds[0]).toFixed(2), h: +(outer.bounds[3] - outer.bounds[1]).toFixed(2), x0: +outer.bounds[0].toFixed(2), y0: +outer.bounds[1].toFixed(2), frame, back: p.stock, depth: frame ? F.stocks[frame].t : null, engraved: !frame,
+            pockets: pockets.map(q => ({ i: q.i, piece: q.piece, x: q.x, y: q.y, rot: q.rot, w: q.w, h: q.h, proud: +q.proud.toFixed(2), notch: !!q.notch })) };
+        };
         const pair = (p) => {
           const tile = spec.parts.find(q => q.kind === 'tile' && q.plus && q.plus.pair === p.id);
           if (!tile) throw new Error(`pair ${p.id}: no tile has plus: { pair: '${p.id}' }`);
@@ -134,7 +178,7 @@
             keyed(pid + '-back', null, `part:${p.id}:back`, () => K.back_art(snom, p.art ? p.art() : EMPTY), { edge: mirrored(snom), back: true, eng_post: g => K.clip_out(g, band_back, 0.6, 1.2), eng_post_key: bk });
           }
         };
-        for (const p of spec.parts) { if (p.kind === 'standee') standee(p); else if (p.kind === 'base') base(p); else if (p.kind === 'pair') pair(p); else flat(p); }
+        for (const p of spec.parts) { if (p.kind === 'standee') standee(p); else if (p.kind === 'base') base(p); else if (p.kind === 'pair') pair(p); else if (p.kind === 'tray') tray(p); else flat(p); }
         // ------------------------------------------------------------ the box
         step('box', 0.4);
         for (const pid of ['floor-base', 'floor-base-under', 'floor-base-map', 'lid-cut', 'lid-inner', 'lid-outer', 'neck-A', 'neck-B']) setStock(pid, pid.startsWith('neck') ? (box.neck || box.stock) : box.stock);
@@ -268,7 +312,7 @@
         for (const pid of Object.keys(part_stock)) if (!part_stock[pid]) throw new Error(`${pid}: no stock recorded`);
         const meta = {
           game: spec.name, T: F.T, T_LO: F.T_LO, stocks: Object.fromEntries(stock_keys.map(k => [k, { name: F.stocks[k].name, mat: F.stocks[k].mat, t: F.stocks[k].t, tlo: F.stocks[k].tlo, kerf: F.stocks[k].kerf, params: { lo: `${k}lo`, hi: `${k}hi`, kerf: `kerf_${k}` } }])),
-          part_stock, part_kind, part_name, part_key, bases, standee_of, box_stock: box.stock, neck_stock: box.neck || box.stock,
+          part_stock, part_kind, part_name, part_key, bases, standee_of, trays, leaf_slots: lay.meta.leaf_slots || {}, box_stock: box.stock, neck_stock: box.neck || box.stock,
           INNER: F.INNER, INNER_BASE: FB.INNER, INNER_LID: FLD.INNER, OUT_BASE: FB.OUT, OUT_LID: FLD.OUT, BASE_EASE: F.BASE_EASE, LID_EASE: F.LID_EASE, WALL_H: F.WALL_H, FLOOR_UP: F.FLOOR_UP, GAP: F.GAP, NECK_H: F.NECK_H, NECK_CL: F.NECK_CL, NECK_OUT: F.NECK_OUT, TABS: F.TABS,
           fits: { WALL_T: F.WALL_T, FLOOR_TAB: F.FLOOR_TAB, FLOOR_SPAN: F.FLOOR_SPAN, SLOT_W: F.SLOT_W, WALL_SLOT_H: F.WALL_SLOT_H, SLOT_Y0: F.SLOT_Y0, NECK_T: F.NECK_T, NECK_FINGER: F.NECK_FINGER, BAND_NOTCH: F.BAND_NOTCH, JIG_CL: F.JIG_CL, stock_hi: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].t])), stock_lo: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].tlo])) },
           kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), sheet_stock: Object.assign({}, sheet_stock, Object.fromEntries(Object.entries(coupon_sheets).map(([n, c]) => [n, c.stock]))), coupon_sheets, sheet0_legend: legend, sheet0_size: lay.meta.sheet0_size, clamp_spots: { legs: lay.o.corner_keepout, sheet_h: SHEET_H },

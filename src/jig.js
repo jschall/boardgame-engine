@@ -102,10 +102,10 @@ function stationPlan(g,c,side,O,padInset) {
 function parameters(tray) {
   assert(tray.kerf>=0.1&&tray.kerf<=0.3,`jig: the box stock's kerf ${tray.kerf} is outside 0.1 to 0.3 mm (the mechanics were validated at 0.18)`);
   return {barWidth:14,barLength:15,armWidth:9,armHalf:14,pivot:20,gap:2,rootRadius:1,
-    theta:0.003,padInset:1,padLow:20,padHigh:22,rampRun:1.5,rampRise:6,
+    theta:0.003,padInset:1,padLow:Math.min(20,tray.height-4),padHigh:Math.min(22,tray.height-2),rampRun:1.5,rampRise:6,
     G:[150,220],nominalG:185,E:3000,friction:0.30,rootFactor:1.4,
     shearLimit:material.shearLimit,bendingLimit:material.bendingLimit,material,tabLength:8,slotClearance:0.15,tabDepth:2.25,
-    sheet:[290,400],minFeature:MIN_LOAD_BEARING_WIDTH};
+    sheet:[300,450],minFeature:MIN_LOAD_BEARING_WIDTH};   /* one nominal sheet, 3 mm margins: a box up to 205 mm inside fits */
 }
 // Rotate (outward distance, height) about the torsion axis. Positive opens pad.
 function rotateSection(g,theta,pivot,t) {
@@ -114,7 +114,8 @@ function rotateSection(g,theta,pivot,t) {
 }
 function build(tray,d=parameters(tray)) {
   const O=tray.out,t=(tray.stock[0]+tray.stock[1])/2;
-  const gaps=[[tray.height/2,tray.slots[0].lo],...tray.slots.slice(0,-1).map((s,i)=>[s.hi,tray.slots[i+1].lo]),[tray.slots.at(-1).hi,O-tray.height/2]];
+  const gaps=[[tray.height/2,tray.slots[0].lo],...tray.slots.slice(0,-1).map((s,i)=>[s.hi,tray.slots[i+1].lo]),[tray.slots.at(-1).hi,O-tray.height/2]].filter(([a,b])=>b-a>=d.armWidth+2*d.gap+2*d.minFeature+2);
+  assert(gaps.length>=1,'no gap between the floor tabs and the corners is wide enough for a spring station');
   const centres=gaps.map(([a,b])=>(a+b)/2),a=d.armWidth/2,L=d.barLength,w=d.barWidth/2,p=d.pivot;
   const edge=p+d.armHalf+d.gap+4,plate=lg.rrect(-edge,-edge,O+edge,O+edge,5);
   const arm=box(-a,p-d.armHalf,a,p+d.armHalf);
@@ -134,7 +135,8 @@ function build(tray,d=parameters(tray)) {
   // A real box opens the inset pads farther; theta is not the available stroke.
   // Mortise is square to the unloaded arm; its integral tab is never rotated in
   // the flat design. The two flat shoulders bear on the arm and must be glued.
-  const loadedBody=Polygon([[1.5,0],[p+6,0],[p+6,29],[1.5,28],[0,22],[0,20],[1.5,18]]);
+  const pl=d.padLow,ph=d.padHigh;   /* the pad face from padLow to padHigh above the plate, a lead-in 2 mm below it, the body 7 mm above it */
+  const loadedBody=Polygon([[1.5,0],[p+6,0],[p+6,ph+7],[1.5,ph+6],[0,ph],[0,pl],[1.5,pl-2]]);
   const tilted=rotateSection(loadedBody,-d.theta,p,t);
   const body=tilted.intersection(box(-5,0,35,40));
   const tab=box(p-d.tabLength/2,-d.tabDepth,p+d.tabLength/2,0.5);
@@ -154,12 +156,12 @@ function seatedInsert(g,t) {
   // Contact at local x=0 measures only the drawn preload, not real-box seating.
   const finished=serializedFinished(g.insert,g.tray.kerf);
   const at=angle=>rotateSection(finished,angle,g.d.pivot,t);
-  const overlap=angle=>at(angle).intersection(box(-5,18,1,25)).bounds[0];
+  const overlap=angle=>at(angle).intersection(box(-5,g.d.padLow-2,1,g.d.padHigh+3)).bounds[0];
   let lo=0,hi=0.02;
   assert(overlap(lo)<0&&overlap(hi)>0,'insert has no positive, reachable seating angle');
   for(let i=0;i<50;i++) {const mid=(lo+hi)/2;if(overlap(mid)<0)lo=mid;else hi=mid;}
-  const loaded=at(hi),pad=loaded.exterior.coords.filter(([y,z])=>z>=18&&z<=25).sort((a,b)=>a[0]-b[0])[0];
-  assert(Math.abs(pad[0])<0.00001&&pad[1]>=19.98&&pad[1]<=22.02,'serialized insert contacts outside 20..22 pad');
+  const loaded=at(hi),pad=loaded.exterior.coords.filter(([y,z])=>z>=g.d.padLow-2&&z<=g.d.padHigh+3).sort((a,b)=>a[0]-b[0])[0];
+  assert(Math.abs(pad[0])<0.00001&&pad[1]>=g.d.padLow-0.02&&pad[1]<=g.d.padHigh+0.02,`serialized insert contacts outside the ${g.d.padLow}..${g.d.padHigh} pad`);
   return {theta:hi,padHeight:pad[1],loaded};
 }
 // Keep generator metadata and the working search on one mechanics implementation.
@@ -195,13 +197,13 @@ function check(g,m) {
   }
   const loaded=rotateSection(g.insert,d.theta,d.pivot,g.t);
   assert(loaded.intersection(box(-5,0,-0.001,tray.height)).area<1e-5,'seated insert penetrates wall');
-  const contact=loaded.intersection(LineString([[0.00001,20],[0.00001,22]]));
-  assert(contact.length>1.95,'pad is not 20..22 mm above plate');
-  assert(loaded.intersection(box(-5,0,0.5,18)).is_empty,'insert hits low proud tab ends');
+  const contact=loaded.intersection(LineString([[0.00001,d.padLow],[0.00001,d.padHigh]]));
+  assert(contact.length>d.padHigh-d.padLow-0.05,`pad is not ${d.padLow}..${d.padHigh} mm above plate`);
+  assert(loaded.intersection(box(-5,0,0.5,d.padLow-2)).is_empty,'insert hits low proud tab ends');
   assert(g.insert.bounds[0]<-0.02,'no unloaded interference');
   assert(d.tabDepth<tray.stock[0]-0.2,'tab sticks below arm');
   mech.checkWorking(g,m);
-  return {paths,contactHeight:[20,22],barWidth:d.barWidth,barLength:d.barLength,parts:1+g.stations.length,stations:g.stations.length,
+  return {paths,contactHeight:[d.padLow,d.padHigh],barWidth:d.barWidth,barLength:d.barLength,parts:1+g.stations.length,stations:g.stations.length,
     padInset:d.padInset,padPlaneSpan:O-2*d.padInset,
     workingStressPass:m.working.stressCeilingsSatisfied,forceTargetsSatisfied:m.working.forceTargetsSatisfied,
     minLoadPath:d.minFeature,underSpringClearance:1};
@@ -224,10 +226,13 @@ function output(g,m,qa,opts,extra) {
   const bb=g.base.bounds,bx=(W-(bb[2]-bb[0]))/2-bb[0],by=21-bb[1];
   put('box-base',bx,by);
   const ib=g.insert.bounds,iw=ib[2]-ib[0],ih=ib[3]-ib[1];
-  const NR=g.stations.length,cols=Math.ceil(Math.sqrt(NR));
-  for(let k=0;k<NR;k++){const row=Math.floor(k/cols),col=k%cols;put('box-ramp',bx+29-ib[0]+col*(iw+2.1),by+29-ib[1]+row*(ih+2.1),0,`box-ramp-${k+1}`);}
+  const NR=g.stations.length,hb=g.centreHole.bounds,hw=hb[2]-hb[0]-4,hh=hb[3]-hb[1]-4;
+  const cols=Math.max(0,Math.floor((hw+2.1)/(iw+2.1))),rows=Math.max(0,Math.floor((hh+2.1)/(ih+2.1))),inHole=Math.min(NR,cols*rows);
+  for(let k=0;k<inHole;k++){const row=Math.floor(k/cols),col=k%cols;put('box-ramp',bx+hb[0]+2-ib[0]+col*(iw+2.1),by+hb[1]+2-ib[1]+row*(ih+2.1),0,`box-ramp-${k+1}`);}
+  let below=by+bb[3]+4;   /* the rest in rows across the sheet under the base */
+  if(inHole<NR){const per=Math.floor((W-7+2.1)/(iw+2.1));for(let k=inHole;k<NR;k++){const j=k-inHole,row=Math.floor(j/per),col=j%per;put('box-ramp',3.5-ib[0]+col*(iw+2.1),below-ib[1]+row*(ih+2.1),0,`box-ramp-${k+1}`);}below+=Math.ceil((NR-inHole)/per)*(ih+2.1)+2;}
   if(extra){
-    const nb=extra.bounds,cy=by+bb[3]+4,cx=(W-(nb[2]-nb[0]))/2;
+    const nb=extra.bounds,cy=below,cx=(W-(nb[2]-nb[0]))/2;
     for(const [pid,x,y,rot,gid] of extra.items)put(pid,cx+x-nb[0],cy+y-nb[1],rot,gid);
   }
   assert(items.length===1+g.stations.length+(extra?extra.items.length:0),'the jig sheet lost a part');
@@ -245,7 +250,7 @@ function output(g,m,qa,opts,extra) {
   const inner=cutGroups.map(q=>`<g transform="${q.tr}">${q.paths.slice(1).join('')}</g>`).join('');
   const outer=[...cutGroups.filter(q=>q.id!=='box-base'),...cutGroups.filter(q=>q.id==='box-base')].map(q=>`<g id="${q.gid}-outline" transform="${q.tr}">${q.paths[0]}</g>`).join('');
   const meta={design:`${g.stations.length} integral two-bar torsion stations + ${g.stations.length} identical glued ramp inserts`,sheet_w:W,sheet_h:H,headers,kerf:g.tray.kerf,kerf_comp:'file',margin:3,stock:g.tray.stockKey,
-    part_kerf:Object.fromEntries(Object.keys(parts).map(k=>[k,g.tray.kerf])),boxPartCount:1+g.stations.length,extraPartCount:extra?extra.items.length:0,partCount:items.length,padCentres:g.centres,padHeight:[20,22],dimensions:g.d,mechanics:m,checks:qa,
+    part_kerf:Object.fromEntries(Object.keys(parts).map(k=>[k,g.tray.kerf])),boxPartCount:1+g.stations.length,extraPartCount:extra?extra.items.length:0,partCount:items.length,padCentres:g.centres,padHeight:[g.d.padLow,g.d.padHigh],dimensions:g.d,mechanics:m,checks:qa,
     // Where each ramp stands in the ASSEMBLED jig, not where it is nested for
     // cutting. The angle is measured by pushing a unit step along the arm
     // through the same sidePlan transform the geometry uses, so a mirrored
@@ -262,7 +267,7 @@ function output(g,m,qa,opts,extra) {
     }),
     extra:extra?extra.meta:null,assembly:['Glue each box insert square into its mortise, ramp facing inward; let cure.',
     `Set the base on a flat central bench support at most ${Math.floor(g.O-6)} x ${Math.floor(g.O-6)} mm; leave at least 1 mm air below all spring stations. The support is workholding, not a cut jig part.`,
-    'Lower the tray open side up; pad faces bear 20–22 mm above the plate. Lift straight up to remove.'].concat(extra&&extra.assembly?[extra.assembly]:[])};
+    `Lower the tray open side up; pad faces bear ${g.d.padLow}–${g.d.padHigh} mm above the plate. Lift straight up to remove.`].concat(extra&&extra.assembly?[extra.assembly]:[])};
   delete meta.checks.paths;
   const title=headers.join(' / '),svg=doc(eng_svg(headerEng)+engraving+inner+outer,W,H,title,meta);
   assert(!/<text\b|#00a000|id="reference"/.test(svg),'jig sheet must use outlines, no reference');
@@ -316,7 +321,7 @@ async function main(GAME_DIR, argv) {
   const g=build(tray),m=mechanics(g),qa=check(g,m),result=output(g,m,qa,opts,extra);
   if(!opts.noRender)await render(g,result,opts);
   console.log(`JIG CHECK PASS: ${g.d.sheet.join(' x ')} mm; ${result.meta.partCount} parts (box ${1+g.stations.length}${extra?', extra '+extra.items.length:''}); kerf ${g.tray.kerf} in-file, machine OFF.`);
-  console.log(`Pads ${g.centres.map(x=>x.toFixed(3)).join(', ')}; inset ${g.d.padInset} mm/side, plane span ${g.O-2*g.d.padInset} mm; height 20–22 mm; two ${g.d.barWidth} x ${g.d.barLength} mm bars/station; drawn preload twist ${(g.d.theta*180/Math.PI).toFixed(4)} deg.`);
+  console.log(`Pads ${g.centres.map(x=>x.toFixed(3)).join(', ')}; inset ${g.d.padInset} mm/side, plane span ${g.O-2*g.d.padInset} mm; height ${g.d.padLow}–${g.d.padHigh} mm; two ${g.d.barWidth} x ${g.d.barLength} mm bars/station; drawn preload twist ${(g.d.theta*180/Math.PI).toFixed(4)} deg.`);
   console.log(m.scope);
   console.log(`WORKING STRESS PASS at ${m.working.interferencePerSide} mm/side (${m.working.boxes.map(b=>`${b.name} ${b.boxSize} mm: ${b.interferencePerSide.toFixed(2)}`).join(', ')}); softer-design force targets ${m.working.forceTargetsSatisfied?'PASS':'NOT MET (see working cases)'}.`);
   for(const c of m.cases)console.log(JSON.stringify(c));

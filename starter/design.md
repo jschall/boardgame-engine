@@ -25,7 +25,7 @@ RULES (basket, moves, ordersToEnd) here with `--tune`.
 | barn tile with the scarecrow pair | 1 + 2 halves | 44 mm square, scarecrow 46 mm tall | 3 mm |
 | farmer standee on a keyed base | 4 | 36 mm tall, base 18 mm | 3 mm |
 | crow on its base | 1 | 26 mm tall, base 20 mm | 3 mm |
-| basket board | 4 | 80 x 28 mm | 3 mm |
+| basket tray (a 1.5 mm pocket layer on a 3 mm back) | 4 | 80 x 32 mm | 3 + 1.5 mm |
 | fruit token | 40 (10 per fruit) | 16 mm | 3 mm |
 | order card | 12 | 48 x 68 mm | 1.5 mm |
 | box | 2 trays, 4 neck boards | 160 mm inside, 24 mm walls | 3 mm |
