@@ -177,7 +177,7 @@ async function main() {
     await pg.setViewportSize({ width:390, height:844 });
     assert(await pg.evaluate(() => { const s = document.getElementById('stage').getBoundingClientRect(); return Math.round(s.height) === innerHeight && document.documentElement.scrollWidth <= innerWidth; }), 'mobile: the stage fills the viewport, no horizontal overflow');
     await pg.locator('#nav [data-open="rules"]').click();
-    await pg.waitForFunction(() => window.__manual.single);
+    await pg.waitForFunction(() => window.__manual.single); await idle();   /* the viewer relays out; a select during a turn is ignored */
     await pg.locator('#manual-page').selectOption('1'); await pageIs(1);
     assert.equal(await pg.locator('#book .sheet[aria-hidden="false"]').count(), 1);
     await shot('#modal-rules .modal-box', 'manual-mobile.png');
