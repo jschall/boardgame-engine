@@ -1,11 +1,15 @@
 {
   "page": "orchard.html",
+  "parts": "parts/parts.json",
   "preview": "preview",
   "out": "judge",
+  "settle_ms": 5000,
+  "canvas_selector": ".cwrap",
+  "common": "Wood grain in the 3D renders is procedural: ignore grain, colour bands or seams in the wood and judge the engraving, shapes and assembly. Production: 40 W diode laser, strictly two tones (engraved black or bare wood); strokes around 0.45 mm and gaps around 0.6 mm read best but are not limits; parts are looked at from about 60 cm.",
   "groups": {
-    "trees": { "brief": "Sixteen orchard tiles: a tree of each fruit, the fruit's name along the bottom, a fine border. The fruit must be told apart at a glance from across the table.", "match": ["tile-"], "shots": ["#shot=parts&id=view-orchard"] },
-    "figures": { "brief": "The four farmers (a hatband dot per seat), the crow and the scarecrow: silhouettes readable from 60 cm, two tones.", "match": ["farmer-", "crow", "scarecrow-"], "shots": ["#shot=parts&id=asm-farmer-red", "#shot=parts&id=asm-barn"] },
-    "cards": { "brief": "Twelve order cards: the name, the fruit needed in a row, the points in a corner badge; identical backs.", "match": ["order-"] },
-    "box": { "brief": "The lid: a frame, the medallion with the tree and the crow, the title ribbon, the choking warning; the base's medallion; the setup map inside.", "ids": ["lid-outer", "lid-inner", "floor-base-under", "floor-base-map"], "shots": ["#shot=box&lift=1", "#shot=box&p=128&y=-30"] }
+    "trees":   { "flat": { "match": ["tile-", "barn"], "scale": 5 }, "shots": { "orchard": "#shot=parts&id=view-orchard" }, "brief": "Sixteen orchard tiles, a tree of each fruit with the fruit's name along the bottom and a fine border, and the barn. The fruit must be told apart at a glance from across the table." },
+    "figures": { "flat": { "match": ["farmer-", "crow", "scarecrow-", "base-"], "scale": 6 }, "shots": { "farmer": "#shot=parts&id=asm-farmer-red", "barn": "#shot=parts&id=asm-barn" }, "brief": "The four farmers (a hatband dot per seat) on their keyed bases, the crow and the scarecrow: silhouettes readable from 60 cm, two tones, faces on plain wood." },
+    "cards":   { "flat": { "match": ["order-", "basket-", "token-"], "scale": 4 }, "shots": {}, "brief": "Twelve order cards (the name, the fruit needed in a row, the points in a corner badge; identical backs), the basket boards and the fruit tokens." },
+    "box":     { "flat": { "ids": ["lid-outer", "lid-inner", "floor-base-under", "floor-base-map"], "match": ["wall-"], "scale": 3 }, "shots": { "closed": "#shot=box", "lifted": "#shot=box&lift=1&p=48", "under": "#shot=box&p=128&y=-30" }, "brief": "The shoulder box: the lid's frame, the medallion with the tree and the crow, the title ribbon, the choking warning; the lid walls and base walls; inside the lid the rules; under the base the medallion; inside the base the setup map." }
   }
 }
