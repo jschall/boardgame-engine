@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* manual-embed.js (boardgame-engine): embed the game's actual print manual (manual/manual.html's generator, its CSS and every asset) into the page as a
    page-turning book, without maintaining a second copy of its rules. module.exports(GAME_DIR) -> { styles(), scripts() }. */
 'use strict';

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* manual/check.js (boardgame-engine): what every print rulebook must satisfy, checked against the built PDFs and the page's cut files:
    the press PDF has the page count game.json promises with 180 mm trim and 186 mm bleed boxes; the booklet is US Letter with every logical page
    exactly once; the layout audit found no overflow, missing image or orphan; every part drawing in assets/ still carries the production paths

@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* jig_view.js (boardgame-engine): one construction of the jig data the 3D viewer needs, shared by page/build.js (which writes it into the page) and
    checks/scenes.js (which replays the page's assemblies in node for fitcheck). Add a key here and both callers get it. */
 'use strict';

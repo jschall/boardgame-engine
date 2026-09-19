@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* concentric.js (boardgame-engine): a shape as a concentric scoring path. Reads an SVG (closed paths with any commands, polygons, rects, circles
    and ellipses; curves flattened; open subpaths, i.e. strokes, are skipped), takes the union of its filled shapes (even-odd, so a hole in a path is a hole), draws the concentric fill the
    layout's vector fill uses (closed lines `pitch` apart, the outermost on the shape's edge, inward until nothing is left, one closing line where

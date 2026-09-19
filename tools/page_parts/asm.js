@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
   /* ------------------------------------------------------------ the parts viewer's assemblies: the box (machinery) and the game's (GameTable adds them with api.addAsm) */
   const PV = { static: [], dynamic: [], home: null, current: null, k: 0 };

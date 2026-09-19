@@ -32,4 +32,4 @@ Either way you end up with a folder like `lighthouse/` holding `lighthouse-sim.j
 
 One prompt in an empty folder yields a game folder: the rules engine with its AI and design gates, the cut sheets (SVG, kerf-compensated, with the kerf coupons), the shoulder box and its glue jig, the packing plan, a self-contained HTML page (press the button: the box opens in 3D, every piece flies to its place, the AI plays), and the rulebook as a press PDF and a booklet. `skills/boardgame-create/SKILL.md` is the workflow; `reference/` the standards and the design procedure; `templates/` the judges.
 
-License: GPL-3.0-or-later (see the repository's `LICENSE`).
+License: MPL-2.0 (the repository's `LICENSE`); a game made with it is its author's, under any license (the engine README, License).

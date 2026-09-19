@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
   /* the log's first line, the opening (the engine animates the events it adds), the round line and the queen's move */
   const gameLine = g => `<b>Game ${g.seed}.</b> ${[0, 1, 2, 3].map(c => `${dot(c)}${NAMES[c]} (${S.COLONIES[c].name})`).join(', ')}. Each has kept ${g.rules.keepWishes === 1 ? 'one secret Queen\'s Wish' : `${g.rules.keepWishes} secret Queen's Wishes`}.`;

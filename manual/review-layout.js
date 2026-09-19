@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* review-layout.js (boardgame-engine): DOM evidence of the layout defects independent reviews keep catching in rulebooks: pages with a worked example or a
    safety warning, captions and paragraphs ending in a one-word line (orphans). Runs in the manual page; manual/build.js records it in qa/layout.json. */
 module.exports=()=>{

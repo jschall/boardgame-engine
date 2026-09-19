@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // render_for_judge.js: renders every art-bearing group for an independent judge: one PNG per flat part (from preview.js pages) and
 // 3D renders from the built page, each 3D shot on a freshly loaded page. Writes judge/<group>/*.png and judge/<group>/brief.txt.
 // Usage:  node render_for_judge.js judge.json          (see templates/judge.json for the config shape)

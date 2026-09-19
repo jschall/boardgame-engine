@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // scenes.js (boardgame-engine): the 3D placements fitcheck.js samples for interference, for any game on the engine.
 // Nothing here is copied by hand: it runs the engine's page.js and the game's table.js in node with a stub DOM, so every tray, wall, neck, tile,
 // standee, token and card sits exactly where the page puts it, and reads the scenes through the page's window.__placements hook:

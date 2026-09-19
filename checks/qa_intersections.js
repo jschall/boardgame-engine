@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // qa_intersections.js: finds solid pieces that pass through each other in the BUILT PAGE's 3D scenes (the placements the page really uses,
 // including mid-animation states), and checks the inventory (owner's rule: the table shows every piece at all times).
 // The page must expose window.__scene (a Render3D scene with .static/.dynamic instance lists, basis() and world()), and for animated

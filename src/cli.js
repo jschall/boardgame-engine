@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // cli.js (boardgame-engine): the game's cut files from measured stock thicknesses: writes parts/parts.json and parts/<sheet>.svg, manifest.json and the
 // engraving cache the page's worker starts from. Run from the game folder (node engine/bin/bg.js parts):
 //   node engine/src/cli.js ['#t3lo=2.67&t3hi=2.92&kerf_t3=0.18'] [--jobs N] [--out DIR] [--no-write] [--quiet] [--part-files] [--no-cache] [--preset NAME]

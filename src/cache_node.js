@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // cache_node.js (boardgame-engine), node only: a file store for the geometry caches, so a rebuild at another stock thickness or kerf (a new process) reuses
 // the thickness-independent work:
 //   M|<memo key>        art geometry memoised by the art modules (K.memo), kept when it took 200 ms or more to make

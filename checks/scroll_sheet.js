@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* scroll_sheet.js (boardgame-engine): real-time contact sheet of the opening. Loads the page with no hash, presses the box button and shoots the viewport
    N times, evenly through the opening, on the machine's GPU; then montages the frames. (Until 2026-09-18 the opening was scroll-driven and this
    script scrolled the window; the button runs it in time now.)

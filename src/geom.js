@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* boardgame-create engine: from a game's parts spec to the cut files. make_game(spec) returns the GAME object lasergeom.build(GAME, P) runs, in
    node (bin/bg.js parts) and in the page's worker (a stock change regenerates everything). It registers every part with its art (front and back),
    makes standee tabs and leaf-spring bases with keys, adds the box (engine/box.js), nests everything onto 300 x 450 sheets by stock with identical
@@ -42,7 +44,7 @@
         if (!Array.isArray(p.pockets) || !p.pockets.length) throw new Error(`tray ${p.id}: pockets = [{ piece | shape, x, y, rot, notch }]`);
         for (const q of p.pockets) if (!(q.piece && typeof q.piece === 'string') && !(q.shape && q.shape.geom_type)) throw new Error(`tray ${p.id}: each pocket names a piece (its id) or gives a shape`);
         if (p.frame !== undefined && p.frame !== null && !spec.stocks[p.frame]) throw new Error(`tray ${p.id}: frame ${p.frame} is not a stock`);
-      } else if (!p.shape || !p.shape.geom_type) throw new Error(`part ${p.id}: shape must be a lasergeom polygon`);
+      } else if (!p.shape || (!p.shape.geom_type && typeof p.shape !== 'function')) throw new Error(`part ${p.id}: shape must be a lasergeom polygon, or a function of the built fits F -> polygon`);
       if (p.art !== undefined && p.art !== null && typeof p.art !== 'function') throw new Error(`part ${p.id}: art must be a function drawing the engraving (or null)`);
       if (p.back !== undefined && p.back !== null && typeof p.back !== 'function' && p.back !== true) throw new Error(`part ${p.id}: back must be a function, true (the front mirrored) or null`);
       out.push(Object.assign({ art: null, back: null, name: p.id.replace(/-/g, ' ') }, p));
@@ -99,8 +101,9 @@
     const stock_keys = Object.keys(stocks);
     const stock_of = {};   // pid -> stock key (back faces follow their fronts)
     const P0 = stock.nominal_params(stocks);
+    let NEED_F = null;   /* the built fits, once generate has them: the neck's split depends on the box's size */
     const need = () => {
-      const n = BOX.NEED();
+      const n = BOX.NEED(NEED_F);
       for (const p of spec.parts) {
         if (p.kind === 'pair') { n[`${p.id}-a`] = p.count; n[`${p.id}-b`] = p.count; } else n[p.id] = p.count;
         if (p.kind === 'tray' && p.frame !== null) { const thinner = Object.keys(spec.stocks).filter(k => k !== p.stock && spec.stocks[k].nominal < 0.75 * Math.min(...p.pockets.map(q => q.piece ? spec.stocks[spec.parts.find(r => r.id === q.piece).stock].nominal : (q.t || spec.stocks[p.stock].nominal)))); if (p.frame || thinner.length) n[`${p.id}-frame`] = p.count; }
@@ -113,7 +116,9 @@
       stocks,
       spec,
       edge_scores: true, compensate: true,
-      layout: P => ({ registration: 'crosses', cross_length: 3, cross_edge: 'bottom', mark_gap: 0.25, center_along: true, corner_marks: 'score', corner_keepout: 15, margin_x: 3.0, margin_bottom: 3.0,
+      /* spec.sheet: { w, h, margin_x, margin_bottom } for stock other than the 300 x 450 mm sheet the engine assumes (TUMBLER lays 12 x 18 in sheets edge to edge) */
+      layout: P => ({ registration: 'crosses', cross_length: 3, cross_edge: 'bottom', mark_gap: 0.25, center_along: typeof spec.sheets !== 'function', center_across: typeof spec.sheets !== 'function', corner_marks: 'score', corner_keepout: 15, margin_x: (spec.sheet && spec.sheet.margin_x) || 3.0, margin_bottom: (spec.sheet && spec.sheet.margin_bottom) || 3.0,
+        sheet_w: (spec.sheet && spec.sheet.w) || SHEET_W, sheet_h: (spec.sheet && spec.sheet.h) || SHEET_H,
         speck_area: 0.12, speck_len: 0.5, back_of: { 'floor-base': 'floor-base-map', 'lid-cut': 'lid-inner' }, title_prefix: (spec.name || 'GAME') + ' ',
         compensate: true, kerf: P[`kerf_${box.stock}`], eng_store: GAME.eng_store || null, edge_scores: true, vector_fill: { pitch: 25.4 / 100 } }),
       need,
@@ -121,7 +126,7 @@
       onprogress: null, eng_store: null, part_filter: null, parts_only: false, on_part: null,
       generate(P, lay) {
         const t0 = Date.now(), times = {};
-        const F = stock.derive(stocks, P, box), F0 = stock.derive(stocks, P0, box);
+        const F = stock.derive(stocks, P, box), F0 = stock.derive(stocks, P0, box); NEED_F = F;
         const CK = lay.o.corner_keepout, W = lay.W, H = lay.H;
         lay.usable2 = sbox(lay.o.margin_x, TOP, W - lay.o.margin_x, H - lay.o.margin_bottom);
         lay.keepout = unary_union([Polygon([[0, 0], [CK, 0], [0, CK]]), Polygon([[W, 0], [W - CK, 0], [W, CK]]), Polygon([[0, H], [CK, H], [0, H - CK]]), Polygon([[W, H], [W - CK, H], [W, H - CK]])]);
@@ -144,13 +149,14 @@
         step('parts', 0.02);
         const flat = (p) => {
           setStock(p.id, p.stock); part_kind[p.id] = p.kind; part_name[p.id] = p.name;
-          const shape = p.shape;
+          const shape = typeof p.shape === 'function' ? p.shape(F) : p.shape;   /* a shape may follow the built stock (a slot the stock's thickness wide) */
+          if (!shape || !shape.geom_type) throw new Error(`part ${p.id}: shape(F) must return a lasergeom polygon`);
           if (p.plus) {   // a tile holding a cross-lapped pair: a + hole with four leaf springs
             const pair = spec.parts.find(q => q.id === p.plus.pair), fp = F.pair(pair.stock, p.stock);
             const site = K.leaf_site(fp.plus_bar, fp.plus_w, kerf_of(p.id), true, null, p.plus.x || 0, p.plus.y || 0);
             const registered = keyed(p.id, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: shape, eng_post: g => K.clip_out(g, site.removed.buffer(1.0)), eng_post_key: 'leaf:' + [fp.plus_bar, fp.plus_w, kerf_of(p.id)].join(',') });
             if (registered) K.leaf_part(lay, p.id, shape, site);
-          } else keyed(p.id, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: shape });
+          } else keyed(p.id, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, Object.assign({ edge: shape }, p.score ? { score: K.score_lines(p.score()) } : {}));   /* score: blue lines drawn on the part (a dial's ticks, a card's circles) */
           if (p.back) { setStock(p.id + '-back', p.stock); keyed(p.id + '-back', null, `part:${p.id}:back`, () => K.back_art(shape, p.back === true ? (p.art ? p.art() : EMPTY) : p.back()), { edge: mirrored(shape), back: true }); }
         };
         const standee = (p) => {
@@ -195,7 +201,7 @@
         for (const p of spec.parts) { if (p.kind === 'standee') standee(p); else if (p.kind === 'base') base(p); else if (p.kind === 'pair') pair(p); else if (p.kind === 'tray') tray(p); else flat(p); }
         // ------------------------------------------------------------ the box
         step('box', 0.4);
-        for (const pid of ['floor-base', 'floor-base-under', 'floor-base-map', 'lid-cut', 'lid-inner', 'lid-outer', 'neck-A', 'neck-B']) setStock(pid, pid.startsWith('neck') ? (box.neck || box.stock) : box.stock);
+        for (const pid of ['floor-base', 'floor-base-under', 'floor-base-map', 'lid-cut', 'lid-inner', 'lid-outer', 'neck-A', 'neck-B', 'neck-A-half', 'neck-B-half']) setStock(pid, pid.startsWith('neck') ? (box.neck || box.stock) : box.stock);
         for (const s of 'SENW') for (const h of ['base', 'lid', 'lid-up']) setStock(`wall-${s}-${h}`, box.stock);
         const boxSpec = Object.assign({ title: spec.name }, box);
         const { fl } = BOX.add_parts({ keyed, add }, F, F0, boxSpec);
@@ -244,6 +250,7 @@
         step('sheets', 0.6);
         const sheets = [], sheet_stock = {};
         let n = 0;
+        const SHEET_W = lay.W, SHEET_H = lay.H;   /* the spec's sheet, or the engine's 300 x 450 */
         const usable = sbox(lay.o.margin_x, TOP, SHEET_W - lay.o.margin_x, SHEET_H - lay.o.margin_bottom);
         const two_sided = new Set();
         const open_sheet = (s) => { n++; const name = `sheet${n}`, S = F.stocks[s]; lay.sheet(name, `sheet ${n} · ${S.name}`, S.mat, S.t, { two_sided: true, kerf: S.kerf }); sheets.push(name); sheet_stock[name] = s; return name; };
@@ -277,7 +284,7 @@
             const pids = [...'SENW'].map(side => `wall-${side}-${which}`), members = pids.map((pid, i) => [pid, 0, i * (F.WALL_H + KS), pid]);
             groups.push({ members, rots: [90, 0], share: true, area: pids.reduce((a, pid) => a + lay.outlines[pid].area, 0), pid: pids[0] });
           }
-          if (s === (box.neck || box.stock)) { const pids = ['neck-A', 'neck-A', 'neck-B', 'neck-B'], members = pids.map((pid, i) => [pid, 0, i * (F.NECK_H + KS), `${pid}-${i}`]); groups.push({ members, rots: [90, 0], share: true, area: pids.reduce((a, pid) => a + lay.outlines[pid].area, 0), pid: 'neck-A' }); }
+          if (s === (box.neck || box.stock)) { const pids = Object.keys(need()).filter(k => /^neck-/.test(k)).flatMap(k => Array(need()[k]).fill(k)), members = pids.map((pid, i) => [pid, 0, i * (F.NECK_H + KS), `${pid}-${i}`]); groups.push({ members, rots: [90, 0], share: true, area: pids.reduce((a, pid) => a + lay.outlines[pid].area, 0), pid: 'neck-A' }); }
           groups.sort((a, b) => b.area - a.area);
           return groups;
         };
@@ -286,7 +293,9 @@
            opens sheets with ctx.sheet(stock) and places every needed part with lay.put / lay.put_box / lay.nest; the engine adds the box's art overlays,
            the titles, the backs and the checks as for its own nesting */
         if (typeof spec.sheets === 'function') {
-          spec.sheets(lay, { F, stocks: F.stocks, kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), usable, TOP, SHEET_W, SHEET_H, need: need(), outlines: lay.outlines, stock_of: pid => stock_of[pid], sheet: open_sheet, sheets });
+          const test_sheet = (name, s, what) => { const S = F.stocks[s]; lay.sheet(name, `${spec.name} ${name} · ${S.name} · ${what}`, S.mat, S.t, { two_sided: false, kerf: S.kerf }); coupon_sheets[name] = { stock: s, what }; return name; };
+          const add_test = (pid, s, cut, eng, o) => { setStock(pid, s); lay.add(pid, cut, eng === undefined ? EMPTY : eng, Object.assign({ kerf: F.stocks[s].kerf }, o || {})); };   /* a test piece of stock s, for a test sheet */
+          spec.sheets(lay, { F, stocks: F.stocks, kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), usable, TOP, SHEET_W, SHEET_H, need: need(), outlines: lay.outlines, stock_of: pid => stock_of[pid], sheet: open_sheet, test_sheet, add_test, sheets, score_lines: K.score_lines });
           const counts = need(), placed = {};
           for (const name of sheets) for (const it of lay.layout[name].items) if (it[0] && !/^(floor-base-under|lid-outer)$/.test(it[0])) placed[it[0]] = (placed[it[0]] || 0) + 1;
           const short = Object.entries(counts).filter(([pid, n]) => n && (placed[pid] || 0) !== n && !/-lid-up$/.test(pid) && !/-back$/.test(pid));
@@ -324,7 +333,7 @@
           lay.layout[name].title = `${spec.name} sheet ${name.slice(5)} · ${F.stocks[sheet_stock[name]].name} · ${words}${Object.keys(cnt).length > 8 ? ', …' : ''}`;
         }
         step('backs', 0.9);
-        Object.keys(lay.layout).forEach(name => lay.center_across(name));
+        if (typeof spec.sheets !== 'function') Object.keys(lay.layout).forEach(name => lay.center_across(name));   /* a game that laid its own sheets placed things where it wants them */
         for (const name of sheets) {
           const has_back = lay.layout[name].items.some(it => it[0] && (lay.parts[it[0] + '-back'] || lay.o.back_of[it[0]]));
           if (has_back) lay.add_backs(name, { what: 'the other faces' });
@@ -341,6 +350,7 @@
           INNER_X: F.INNER_X, INNER_Y: F.INNER_Y, OUT_X: F.OUT_X, OUT_Y: F.OUT_Y, FLOOR: F.FLOOR, TABS_X: F.TABS_X, TABS_Y: F.TABS_Y, N_BANDS: F.N_BANDS, NECK_BANDS: F.NECK_BANDS, NECK_OUT_X: F.NECK_OUT_X, NECK_OUT_Y: F.NECK_OUT_Y, NECK_ON: F.NECK_ON,   /* the rectangle; a square box has INNER_X = INNER_Y = INNER */
           fits: { WALL_T: F.WALL_T, FLOOR_TAB: F.FLOOR_TAB, FLOOR_SPAN: F.FLOOR_SPAN, SLOT_W: F.SLOT_W, WALL_SLOT_H: F.WALL_SLOT_H, SLOT_Y0: F.SLOT_Y0, NECK_T: F.NECK_T, NECK_FINGER: F.NECK_FINGER, BAND_NOTCH: F.BAND_NOTCH, JIG_CL: F.JIG_CL, stock_hi: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].t])), stock_lo: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].tlo])) },
           kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), sheet_stock: Object.assign({}, sheet_stock, Object.fromEntries(Object.entries(coupon_sheets).map(([n, c]) => [n, c.stock]))), coupon_sheets, sheet0_legend: legend, sheet0_size: lay.meta.sheet0_size, clamp_spots: { legs: lay.o.corner_keepout, sheet_h: SHEET_H },
+          margin_x: lay.o.margin_x, margin_top: TOP, margin_bottom: lay.o.margin_bottom,   /* the layout's margins, for the lint (lasergeom writes sheet_w and sheet_h) */
           generate_ms: Date.now() - t0, stage_ms: times, cache: Object.assign({}, K.memo_stats),
         };
         return { need: need(), meta };

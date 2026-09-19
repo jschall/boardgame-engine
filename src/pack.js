@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* pack.js (boardgame-engine): does every playing piece fit inside the closed shoulder box?
 
    Reads the cut outlines and sheet layout from a parts.json (it never runs the generator), packs the pieces the way a person would (piles by

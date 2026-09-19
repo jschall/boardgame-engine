@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* boardgame-create engine: the stock model and every finished dimension that follows from it.
    A game names its stocks in game.json ({ key: { name, mat, lo, hi, kerf } }): two caliper readings per stock (the thinnest and the thickest the
    owner measured) and the kerf measured on that stock's coupon. Everything a joint needs is derived here, once, from those readings: slots and bars
@@ -65,7 +67,7 @@
     }
     return D;
   }
-  /** every finished dimension for one parameter set P over the game's stocks. box: { stock, neck (stock key), inner (a side, or [x, y]), wall_h, floor: 'raised' | 'flush', gap, neck_on } */
+  /** every finished dimension for one parameter set P over the game's stocks. box: { stock, neck (stock key), inner (a side, or [x, y]), wall_h, floor: 'raised' | 'flush', gap, neck_on, neck_split } */
   function derive(stocks, P, box) {
     const S = {};
     for (const k of Object.keys(stocks)) {
@@ -111,7 +113,7 @@
       FLOOR_TAB: B.t + FIT.tab_proud, FLOOR_EDGE: FIT.finger, FLOOR_SPAN: INNER + 2 * FIT.finger, FLOOR_SPAN_X: INNER_X + 2 * FIT.finger, FLOOR_SPAN_Y: INNER_Y + 2 * FIT.finger,
       EASE: 0, TRAY: null, BASE_EASE: FIT.base_ease, LID_EASE: FIT.lid_ease, BAND_NOTCH: FIT.band_notch, CORE_RELIEF: FIT.core_relief,
       SLOT_W: D.TAB_W, WALL_SLOT_H, SLOT_Y0: WALL_H - FLOOR_UP - WALL_SLOT_H,
-      NECK_H, NECK_ON, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
+      NECK_H, NECK_ON, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_SPLIT: box.neck_split || 0,   /* neck boards longer than this are cut as two halves meeting at a plain seam (a long box on a short sheet) */ NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
       NECK_OUT_X: INNER_X + 2 * FIT.finger - 2 * FIT.neck_cl, NECK_OUT_Y: INNER_Y + 2 * FIT.finger - 2 * FIT.neck_cl,
       JIG_CL: D.JIG_CL,
       /** a standee cut from stock `s` standing in a base or tile of stock `b`: its tab depth, and the slot it needs */

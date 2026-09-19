@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* page_gate.js (boardgame-engine): the live page gate: structure, the real manual embedded, offline assets, the opening (the box button runs it
    forward and back, the hooks freeze it), the reader's flow (the game starts by itself when the box is open, closing packs the live game, opening
    resumes it), the rulebook modal (the book alone, a click or a swipe turns a bending page), phones, the parts panel, the files modal with a stock

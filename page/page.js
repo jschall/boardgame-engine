@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* page.js (boardgame-engine): the stage, the game and the files section. Machinery shared by every game: the 3D scene, the shoulder box, the
    parts viewer, the modes and modals, the timing, log and chips, the demo loop and the QA contract, the sheet cards and lightbox, the stock inputs
    and the geometry worker, and the opening the box button runs. The game itself is GameTable(api): the table layout, initTable, setBoardFromState,

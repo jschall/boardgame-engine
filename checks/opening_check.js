@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* Does anything pass through anything else while the box is unpacked? Freezes the opening at many values of its progress p (the #intro= hook, on the
    machine's GPU) and runs the same interior-sampling intersection test qa_intersections.js uses on the live scene at each one: every instance
    the page draws, in the pose the page draws it (groups, tilts, flights). Prints the intersecting pairs per position and exits 1 if any.

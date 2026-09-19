@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """split_bumble_page.py: the engine's page/page.js and BUMBLE's table.js were first made by splitting BUMBLE & BLOOM's page.js (the game blocks out,
 the machinery generalised). This is that split, by anchors, so a later BUMBLE page.js (the flight planner keeps improving) can be re-split:
 

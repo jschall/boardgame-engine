@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // page_check.js: static checks on the built single-page HTML before any browser run.
 //   - every inline <script> block parses (node --check): catches a stray // comment swallowing single-line page JS, unescaped quotes, etc.
 //   - the required sections exist in order: #demo, #rules, #files (#art between rules and files is optional); the stage has The table and Parts tabs; a fixed-height log; download links for every sheet

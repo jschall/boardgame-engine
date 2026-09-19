@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // browser.js (boardgame-engine): the one place the checks launch Chromium. launch(): software rendering (SwiftShader) by default, so a check gives
 // the same answer on every machine, or the machine's GPU with BG_GPU=1 (headless Chromium reaches it with these flags; ten times faster on a big
 // page). launchGPU(): the GPU unless BG_GPU=0, for the checks that look at what the reader sees (the scroll contact sheet, the opening sweep).

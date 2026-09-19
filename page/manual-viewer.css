@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* These rules only present the generated paper pages; typography lives in the manual. */
 .manual-reader { border-radius:16px; background:#e6d7b9; padding:10px 16px 14px; outline-offset:5px; }
 #manual-stage { position:relative; width:100%; overflow:hidden; touch-action:pan-y pinch-zoom; }

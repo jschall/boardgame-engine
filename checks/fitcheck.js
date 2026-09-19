@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // fitcheck.js: interference checker for laser-cut parts placed in 3D scenes (closed box, packed box, table during play, assemblies).
 // Rasterises every part's solid at RES mm from its cut outline (holes respected), places it exactly as render3d's basis() does, and
 // samples every part's volume against every other part's volume. Overlap deeper than `contact` mm is INTERFERENCE (exit 1); shallower is a listed contact.

@@ -7,11 +7,11 @@
       "name": "boardgame-create",
       "source": "./plugins/boardgame-create",
       "description": "Design and fully produce a laser-cut board game from one prompt: rules engine and self-play, kerf-compensated cut files, the shoulder box with its glue jig, a 3D page that opens the box and plays the game, and the print rulebook. Clones the boardgame-engine as the game's submodule.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": { "name": "Jonathan Challinger" },
       "homepage": "https://github.com/jschall/boardgame-engine",
       "repository": "https://github.com/jschall/boardgame-engine",
-      "license": "GPL-3.0-or-later",
+      "license": "MPL-2.0",
       "category": "productivity",
       "keywords": ["board game", "laser cutter", "game design", "svg", "rulebook", "3d"]
     }

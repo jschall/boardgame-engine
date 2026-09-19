@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // verify_anim.js: real-time animation QA with playwright (never headless virtual time: it stalls requestAnimationFrame tweens after the first).
 // Plays the page's animated game, watches for page errors, reads the page's own QA hooks and takes periodic screenshots for the animation judge.
 // The page must implement (see reference/page.md):

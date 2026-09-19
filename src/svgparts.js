@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* Read a part's inner SVG (as parts.json stores it) back into geometry and measures: the cut outline as one polygon with its holes, the engraving's
    evenodd area, score segments. Used by the packer and the checks. Node or browser (BGEngine.svgparts). */
 (function (root, factory) {

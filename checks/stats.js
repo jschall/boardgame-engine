@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* stats.js (boardgame-engine): self-play numbers for the page (stats.json) and the showcase game it animates (showcase.json), from any engine
    that follows the sim contract: playGame(seed, players) -> a finished Game with .round, .log and .final(); drama(game) -> a number (the game's
    own measure of a showcase: a close finish, its signature moments, a reasonable length), else the engine's default below.

@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* jig_mech.js (boardgame-engine): the box glue jig's material data, the owner's observation on cut wood and the working-load model of its torsion
    bars (validated on BUMBLE & BLOOM's cut jig, 2026-09-17). src/jig.js runs it as the jig's gate. */
 'use strict';

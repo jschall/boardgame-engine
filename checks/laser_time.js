@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* laser_time.js (boardgame-engine): the estimated machine time of every sheet's engraving, and what the vector fill decided. Reads
    parts/parts.json (meta.vector_fill, written by the layout's plan_vector_fill) and prints, per sheet, the raster seconds under the sweep-and-merge
    model before and after the conversions, the vector seconds added, and each element decided on (converted or rejected, with the raster rows

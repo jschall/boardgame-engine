@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* manual/build.js (boardgame-engine): the print rulebook from the game's manual/manual.html: a press PDF (180 x 180 mm trim, 3 mm bleed, crop marks,
    pages in reading order) and a US Letter fold-and-staple booklet (imposed, 135 mm finished), with a layout audit in manual/qa/layout.json.
    The page count is whatever manual.html lays out; it must be a multiple of four for the booklet. node engine/bin/bg.js manual runs it. */

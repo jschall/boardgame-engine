@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* boardgame-create engine: the shoulder box. Two trays cut from one INNER frame (the lid 0.50 mm a side roomier than the base's 0.10), floors
    with finger tabs on every edge, walls with three-band finger corners and thumb notches, a symmetric neck of four boards, and the panel art:
    the lid top (frame, medallion holding the game's cover art, title ribbon, choking warning), the lid inside (the rules panel typeset from
@@ -115,13 +117,17 @@
   /** the medallion outline of the chosen kind, r = half the size across flats */
   const medallion = (kind, cx, cy, r) => kind === 'hex' ? hexagon(cx, cy, 2 * r, 30) : kind === 'square' ? rrect(cx - r, cy - r, cx + r, cy + r, 6) : C(cx, cy, r, 72);
 
+  /** a whole-panel hook may return geometry or { eng, score }: the engraving here, the score lines by panel_score */
+  const panel = a => a && a.eng !== undefined ? a.eng : a;
+  const panel_score = (spec, name, W, L) => { if (typeof spec[name] !== 'function') return null; const a = memo(`box:panel_score:${name}:${W}x${L}:${spec.art_key || ''}`, () => { const r = spec[name](W, L); return r && r.score && !r.score.is_empty ? r.score : null; }); return a; };
+
   // ------------------------------------------------------------------ the lid top: frame, medallion, cover art, ribbon, warning
   /** spec: { title, cover(cx, cy, r, room) -> art, medal: 'circle'|'hex'|'square', corner(x, y, s, qx, qy) -> art | null, ribbon: true } */
   function lid_outer_art(spec, INNER, INNER_Y = INNER) {
     return memo(`box:lid_outer:${INNER}x${INNER_Y}:${spec.title}:${spec.medal || 'circle'}:${spec.art_key || ''}`, () => {
       const W = INNER, L = INNER_Y, cx = W / 2, g = [];
       /* a game may draw the whole lid top itself (TUMBLER's cover scene); it must carry the choking warning (C6) */
-      if (typeof spec.lid_top === 'function') { const a = spec.lid_top(W, L); if (!a || a.is_empty) throw new Error('box.lid_top drew nothing'); if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.lid_top leaves the lid'); return a; }
+      if (typeof spec.lid_top === 'function') { const a = panel(spec.lid_top(W, L)); if (!a || a.is_empty) throw new Error('box.lid_top drew nothing'); if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.lid_top leaves the lid'); return a; }
       const FR0 = 9.0, FR1 = 12.0, RC = 10.5, ros = [];
       for (const x of [RC, W - RC]) for (const y of [RC, L - RC]) ros.push(rosette(x, y, 5.2));
       const ros_sil = unary_union(ros.map(r => r[1]));
@@ -178,7 +184,7 @@
   function lid_inner_art(spec, INNER, INNER_Y = INNER) {
     return memo(`box:lid_inner:${INNER}x${INNER_Y}:${JSON.stringify(spec.lid)}:${spec.art_key || ''}`, () => {
       const W = INNER, L = INNER_Y;
-      if (typeof spec.lid_inside === 'function') { const a = spec.lid_inside(W, L); if (!a || a.is_empty) throw new Error('box.lid_inside drew nothing'); if (!sbox(4.5, 4.5, W - 4.5, L - 4.5).contains(a)) throw new Error('box.lid_inside leaves the inner face / neck clearance'); return a; }
+      if (typeof spec.lid_inside === 'function') { const a = panel(spec.lid_inside(W, L)); if (!a || a.is_empty) throw new Error('box.lid_inside drew nothing'); if (!sbox(4.5, 4.5, W - 4.5, L - 4.5).contains(a)) throw new Error('box.lid_inside leaves the inner face / neck clearance'); return a; }
       const R = spec.lid; if (!R || !R.title || !Array.isArray(R.columns) || !R.columns.length) throw new Error('rules.js lid: needs title and columns [{ heading, text }]');
       const INSET = 5.0, LINE = 0.85, X0 = 10, X1 = W - 10, g = [outline(rrect(INSET, INSET, W - INSET, L - INSET, 2), LINE)];
       const cols = R.columns.length, gutter = 6, cw = (X1 - X0 - gutter * (cols - 1)) / cols;
@@ -231,7 +237,7 @@
   function base_under_art(spec, INNER, INNER_Y = INNER) {
     return memo(`box:base_under:${INNER}x${INNER_Y}:${JSON.stringify([spec.title, spec.tagline, spec.players, spec.minutes, spec.year, spec.maker, spec.code])}:${spec.art_key || ''}`, () => {
       const W = INNER, L = INNER_Y;
-      if (typeof spec.base_under === 'function') { const a = spec.base_under(W, L); if (!a || a.is_empty) throw new Error('box.base_under drew nothing'); if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.base_under leaves the floor'); return a; }
+      if (typeof spec.base_under === 'function') { const a = panel(spec.base_under(W, L)); if (!a || a.is_empty) throw new Error('box.base_under drew nothing'); if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.base_under leaves the floor'); return a; }
       const g = [], has_code = !!(spec.code && spec.code.length), R = Math.min(52, Math.min(W, L) / 2 - 16), MX = has_code ? Math.max(R + 12, W / 2 - 16) : W / 2, MY = L / 2 - (has_code ? 8 : 0);
       const disc = C(MX, MY, R, 72), ring = C(MX, MY, R - 4.0, 72);
       g.push(outline(disc, 1.0), outline(ring, 0.55), K.stipple(disc.difference(ring.buffer(0.8)).difference(disc.buffer(-0.8)), 1.7, 0.6));
@@ -256,7 +262,7 @@
   function base_inner_art(spec, INNER, INNER_Y = INNER) {
     return memo(`box:base_inner:${INNER}x${INNER_Y}:${spec.title}:${spec.art_key || ''}`, () => {
       const W = INNER, L = INNER_Y;
-      if (typeof spec.base_inside === 'function') { const a = spec.base_inside(W, L); if (!a) return EMPTY; if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.base_inside leaves the floor'); return a; }   /* the whole inside face, or nothing (a bare floor the board lies on) */
+      if (typeof spec.base_inside === 'function') { const a = panel(spec.base_inside(W, L)); if (!a || a.is_empty) return EMPTY; if (!sbox(1, 1, W - 1, L - 1).contains(a)) throw new Error('box.base_inside leaves the floor'); return a; }   /* the whole inside face, or nothing (a bare floor the board lies on) */
       const g = [outline(sbox(6, 6, W - 6, L - 6), 0.8)];
       const map = typeof spec.setup_map === 'function' ? spec.setup_map(W, L) : null;
       if (map && !map.is_empty) { if (!sbox(7, 7, W - 7, L - 7).contains(map)) throw new Error('box.setup_map leaves its frame: keep it inside 7 mm of the floor edge'); g.push(map); }
@@ -284,18 +290,21 @@
 
   // ------------------------------------------------------------------ registering the box's parts and nesting them on their sheet
   /** the standard part ids: floor-base (+ floor-base-under front, floor-base-map back), lid-cut (+ lid-outer front, lid-inner back), wall-<S|E|N|W>-<base|lid>, wall-<side>-lid-up (the art frame), neck-A x2, neck-B x2 */
-  const NEED = () => { const n = { 'floor-base': 1, 'lid-cut': 1, 'neck-A': 2, 'neck-B': 2 }; for (const s of 'SENW') { n[`wall-${s}-base`] = 1; n[`wall-${s}-lid`] = 1; } return n; };
+  /** which neck boards are cut as two halves (F.NECK_SPLIT: boards longer than it) */
+  const split_neck = (kind, F) => F.NECK_SPLIT > 0 && neck_out_of(kind, F) > F.NECK_SPLIT;
+  const NEED = (F) => { const n = { 'floor-base': 1, 'lid-cut': 1 }; for (const k of ['A', 'B']) { if (F && split_neck(k, F)) n[`neck-${k}-half`] = 4; else n[`neck-${k}`] = 2; } for (const s of 'SENW') { n[`wall-${s}-base`] = 1; n[`wall-${s}-lid`] = 1; } return n; };
   /** add every box part to the layout. F: the built fits; F0: the nominal fits (the art frame); spec: the box spec from the game; keyed/add: the registrars from geom.js */
   function add_parts(reg, F, F0, spec) {
     const { keyed, add } = reg, INNER = F.INNER_X, INNER_Y = F.INNER_Y, SZ = F.SQUARE ? String(INNER) : `${INNER}x${INNER_Y}`, FB = stock.tray(F, 'base'), FLD = stock.tray(F, 'lid');
     const mirrored = shape => K.back_art(shape, shape);
     const fl = floor_shape(FB), flL = floor_shape(FLD), flnom = memo(`box:floor:${SZ}`, () => floor_shape(F0));
     add('floor-base', fl);
-    keyed('floor-base-under', null, 'box:floor-under', () => base_under_art(spec, INNER, INNER_Y), { edge: flnom });
-    keyed('floor-base-map', null, 'box:floor-map', () => base_inner_art(spec, INNER, INNER_Y), { edge: mirrored(flnom), back: true });
+    const sc = (name, mirror) => { const g = panel_score(spec, name, INNER, INNER_Y); return g ? { score: K.score_lines(mirror ? K.back_art(flnom, g) : g) } : {}; };
+    keyed('floor-base-under', null, 'box:floor-under', () => base_under_art(spec, INNER, INNER_Y), Object.assign({ edge: flnom }, sc('base_under', false)));
+    keyed('floor-base-map', null, 'box:floor-map', () => base_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('base_inside', true)));
     add('lid-cut', flL);
-    keyed('lid-inner', null, 'box:lid-inner', () => lid_inner_art(spec, INNER, INNER_Y), { edge: mirrored(flnom), back: true });
-    keyed('lid-outer', null, 'box:lid-outer', () => lid_outer_art(spec, INNER, INNER_Y), { edge: flnom });
+    keyed('lid-inner', null, 'box:lid-inner', () => lid_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('lid_inside', true)));
+    keyed('lid-outer', null, 'box:lid-outer', () => lid_outer_art(spec, INNER, INNER_Y), Object.assign({ edge: flnom }, sc('lid_top', false)));
     const keep = (FT, y0, kind) => slot_boxes(y0, FT, kind).buffer(EDGE + 0.2, { join_style: 'mitre' });
     const wall_post = (FT, y0, kind) => { const sx = out_of(kind, FT) / out_of(kind, F0); return { eng_post: g => K.clip_out(sx === 1 ? g : affinity.scale(g, sx, 1, 1, [0, 0]), keep(FT, y0, kind)), eng_post_key: [sx, FT.SLOT_W, FT.WALL_T, FT.EASE, FT.WALL_SLOT_H, y0].concat(F.SQUARE ? [] : [kind, FT.FLOOR]).join('|') }; };
     for (const side of 'SENW') {
@@ -305,7 +314,10 @@
       keyed(`wall-${side}-lid-up`, wall_shape(kind, false, FLD), `box:wall:${side}:lid-up`, () => wall_art_nominal(spec, side, 'lid', F0), Object.assign({ edge: edge_up }, wall_post(FLD, F.FLOOR_UP, kind)));
       keyed(`wall-${side}-lid`, wall_shape(kind, true, FLD), `box:wall:${side}:lid`, () => affinity.rotate(wall_art_nominal(spec, side, 'lid', F0), 180, [O0 / 2, F0.WALL_H / 2]), Object.assign({ edge: edge_top }, wall_post(FLD, F.SLOT_Y0, kind)));
     }
-    for (const kind of ['A', 'B']) add(`neck-${kind}`, neck_shape(kind, F));
+    for (const kind of ['A', 'B']) {
+      if (split_neck(kind, F)) add(`neck-${kind}-half`, neck_shape(kind, F).intersection(sbox(-F.NECK_T - 1, -1, neck_out_of(kind, F) / 2, F.NECK_H + 1)));   /* the board's left half: one finger end, a plain seam at the middle; the other half is this one turned over */
+      else add(`neck-${kind}`, neck_shape(kind, F));
+    }
     return { FB, FLD, fl };
   }
   /** the box sheet: floor and lid tab to tab along the sheet, the eight walls standing against them on shared lines. Returns the y the block ends at. */

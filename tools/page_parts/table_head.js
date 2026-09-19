@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* table.js: BUMBLE & BLOOM on the engine's stage (engine/page/page.js). GameTable(api) returns the game's blocks: the table layout (seats,
    boards, tiles, tokens, standees, cards), initTable, setBoardFromState, animateEvents, the QA contract (assertLegal, noteShown, syncBoard),
    finale, what the players say, the assemblies and views the parts list offers, and the part groups. Everything else on the page is the

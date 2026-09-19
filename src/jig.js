@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* jig.js (boardgame-engine): the shoulder box's glue jig: a 17-piece torsion box jig (one integral base with sixteen two-bar spring stations and
    sixteen identical glued ramp inserts) that squeezes a tray square while its glue sets, on one offcut with any extra jig the game brings (jigs.js).
    node engine/bin/bg.js jig [--parts FILE] [--out DIR] [--preview DIR] [--no-render]

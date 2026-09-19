@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* boardgame-create engine: geometry the games draw with. Tiles, tokens, cards, bases, keyed standee tabs, leaf-spring slots, + holes and
    cross-laps, the engraving hygiene pass, lettering, seeded random, and the memo cache that keeps thickness-independent art across rebuilds.
    Everything is lasergeom geometry in mm, SVG y down. Node (module.exports) or browser (BGEngine.shapes, needs the lasergeom global). */
@@ -189,6 +191,17 @@
       web: site.web, split: site.key, kerf: site.kerf, lines: site.lines.map(l => l.coords), model_svg: lg.cut_svg(solid) };
   }
 
+  /** any geometry as the list of LineStrings the layout's `score` option takes: lines as they are, polygons as their rings */
+  function score_lines(g) {
+    if (!g || g.is_empty) return [];
+    if (Array.isArray(g)) return g.flatMap(score_lines);
+    const t = g.geom_type;
+    if (t === 'LineString' || t === 'LinearRing') return [lg.LineString(g.coords)];
+    if (t === 'MultiLineString' || t === 'GeometryCollection' || t === 'MultiPolygon') return g.geoms.flatMap(score_lines);
+    if (t === 'Polygon') return [g.exterior].concat(g.interiors).map(r => lg.LineString(r.coords));
+    return [];
+  }
+
   // ------------------------------------------------------------------ engraving helpers
   /** lettering as engraving with its strokes held at the laser's minimum: the everyday text call */
   const ink = (s, size, x, y, o = {}) => text_min_stroke(s, size, x, y, { anchor: o.anchor || 'middle', font: o.font || FONT.SB, spacing: o.spacing || 0, min_line: 0.45 });
@@ -242,7 +255,7 @@
   return {
     lg, FONT, FONT_FILES, register_fonts, memo, memo_stats, set_store, warnings, warn, range, dist, pymod, rng, RAD,
     hex_tile, disc, square_tile, card, plate, base_shape, spring_tab, standee_shape, bump, plus_hole, crosslap, centre_band,
-    leaf_site, leaf_base_check, leaf_part, ink, fit_text, hatch, stipple, finish, back_art, mirror, clip_out, arrow, hex_xy, hex_corners,
+    leaf_site, leaf_base_check, leaf_part, ink, fit_text, hatch, stipple, finish, back_art, mirror, clip_out, arrow, hex_xy, hex_corners, score_lines,
     Polygon, Point, LineString, sbox, unary_union, affinity, EMPTY, polys, hexagon, C, rrect, rounded, outline, twidth, centered, DESIGN: D,
   };
 });

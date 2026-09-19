@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* A paper leaf has a front and a back. Turning it reveals the next spread. A click or a swipe turns the page; nothing else is on the
    reader (owner, 2026-09-18: "get rid of the controls and text on the rulebook modal. it should just be click or swipe to turn the page").
    A turning leaf bends: it is drawn as STRIPS hinged one on the next, the outer strips leading, so the page curls as a hand would lift it,

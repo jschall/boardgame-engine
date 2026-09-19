@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // svg_lint.js: automated checks on generated laser parts and sheets (parts/parts.json: {"parts": {pid: inner SVG}, "layout": {...}, "meta": {...}}).
 // Usage:  node svg_lint.js parts/parts.json [--min-line 0.45] [--min-gap 0.6] [--edge 0.6] [--counts manifest.json] [--allow-text] [--strict]
 // Checks (E = error, exit 1; W = warning):

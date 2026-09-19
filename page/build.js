@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* build.js (boardgame-engine): builds the game's single self-contained page: the stage (the opening the box button runs, the self-playing table, the parts
    viewer), the rulebook modal (the print manual embedded as a book) and the laser-files modal (every sheet, downloadable, and the stock inputs
    that regenerate them in a worker).

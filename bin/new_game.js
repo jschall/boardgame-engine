@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* new_game.js (boardgame-engine): a new game folder from the starter (ORCHARD, a complete small game on the engine), renamed, with this engine as
    its git submodule, ready for `node engine/bin/bg.js all`.
      node <engine>/bin/new_game.js <folder> --name "GAME NAME" [--slug game-name] [--engine <git url or path>] [--no-submodule]
@@ -29,7 +31,7 @@ if (!origin) { const r = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd
 const SRC = path.join(ENGINE, 'starter');
 const copy = (from, to) => { for (const f of fs.readdirSync(from)) { const s = path.join(from, f), d = path.join(to, f); if (fs.statSync(s).isDirectory()) { fs.mkdirSync(d, { recursive: true }); copy(s, d); } else fs.copyFileSync(s, d); } };
 copy(SRC, DIR);
-for (const skip of ['parts', 'pack', 'preview', 'shots', 'anim-shots', 'manual/output', 'manual/tmp', 'manual/qa']) fs.rmSync(path.join(DIR, skip), { recursive: true, force: true });
+for (const skip of ['LICENSE', 'pack', 'preview', 'shots', 'anim-shots', 'manual/output', 'manual/tmp', 'manual/qa']) fs.rmSync(path.join(DIR, skip), { recursive: true, force: true });
 fs.renameSync(path.join(DIR, 'orchard-sim.js'), path.join(DIR, `${slug}-sim.js`));
 const camel = slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('');
 const textFiles = f => /\.(js|json|md|html|css)$/.test(f);
@@ -60,6 +62,8 @@ Replace the game one file at a time, with the chain green after each:
 5. table.js: the table layout and the animation of every event (the GameTable contract in engine/README.md). Then \`bg page\`, \`bg fit\`, \`bg check\`.
 6. page.js: the sheet catalogue and banned words; pack.js (optional): the piles; jigs.js (optional): extra glue jigs.
 7. design.md, iterations.md: the design record and every gauntlet round.
+
+The game is yours: the starter is public domain (CC0) and the engine's MPL-2.0 asks only that its own files keep their notices (engine/README.md, License). Add the LICENSE you choose.
 `);
 git(['add', '-A']);
 console.log(`${name} started in ${DIR} (slug ${slug}; engine ${noSub ? 'copied' : 'submodule of ' + origin})\nnext: cd ${dest} && node engine/bin/bg.js doctor && node engine/bin/bg.js all`);

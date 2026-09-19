@@ -19,6 +19,8 @@
      node engine/bin/bg.js new <folder> --name "GAME NAME"   a new game folder from the starter, with this engine as its submodule
 
    Every step exits 1 on a failed check, so a chain stops at the first problem. */
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 'use strict';
 const fs = require('fs'), path = require('path'), { spawnSync } = require('child_process');
 const ENGINE = path.join(__dirname, '..');

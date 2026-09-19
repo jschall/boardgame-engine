@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* balance.js: self-play numbers for any game engine that follows the sim contract, judged against the engine's balance targets, with an optional
    grid search over rule tunables. The engine decides; the owner is never asked to pick numbers ("you make the decisions on gameplay").
 

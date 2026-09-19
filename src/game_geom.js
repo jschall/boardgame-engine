@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // game_geom.js (boardgame-engine), node only: load a game's geometry generator (game.json's geom: a UMD that exports the GAME object lasergeom.build runs,
 // with register_fonts and set_store on it) and register the engine's fonts on it. Both the parts CLI and its prewarm workers start here.
 'use strict';

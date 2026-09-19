@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* manual/assets.js (boardgame-engine): the rulebook's figures from the real cut files and the built page, so nothing in the book is drawn twice.
    The game's manual/figures.js says what to capture: module.exports = ({ META, PARTS, S }) => ({
      parts: ['tile-apple-1', 'farmer-red', ...],                               each becomes assets/<id>.svg (the production paths in print colours)

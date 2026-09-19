@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # land_bumble_port.sh: put BUMBLE & BLOOM onto the engine in place. Copies the ported game files from the port folder over the game folder, removes
 # the machinery the engine now owns, and adds the engine as the game's submodule. Run once, from anywhere:
 #     bash engine/tools/land_bumble_port.sh <port folder> <bumble folder> <engine url or path>

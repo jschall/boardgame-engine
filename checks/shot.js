@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
+   This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 // shot.js: screenshot of the game page (WebGL, no GPU) with playwright, waiting for the page's first drawn frame.
 // Usage:  node shot.js page.html '<hash>' out.png [WxH] [css-selector]
 //    e.g. node shot.js game.html '#shot=table&p=40&y=0' table.png 1400,1000           # the viewport, after the first frame
