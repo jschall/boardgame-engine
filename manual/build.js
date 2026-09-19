@@ -22,10 +22,27 @@ async function main(GAME_DIR){
  fs.writeFileSync(path.join(ROOT,'qa/layout.json'),JSON.stringify(audit,null,2));
  await pg.pdf({path:path.join(ROOT,'tmp/pdfs/chromium.pdf'),printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false});
  const N=audit.pageCount;if(!(Number.isInteger(N)&&N>=4&&N%4===0))throw Error(`the manual lays out ${N} pages; the booklet needs a multiple of four`);
- await pg.goto('file://'+path.join(ENGINE,'manual','imposition-guide.html'));await pg.evaluate(o=>window.makeGuides(o),{pageCount:N,sheetCount:N/4,size:135,bleed:3});await pg.evaluate(()=>document.fonts.ready);
+ if((CFG.manual&&CFG.manual.format)!=='letter')await pg.goto('file://'+path.join(ENGINE,'manual','imposition-guide.html'));
+ if((CFG.manual&&CFG.manual.format)!=='letter')await pg.evaluate(o=>window.makeGuides(o),{pageCount:N,sheetCount:N/4,size:135,bleed:3});await pg.evaluate(()=>document.fonts.ready);
  await pg.pdf({path:path.join(ROOT,'tmp/pdfs/guides.pdf'),printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false});await browser.close();
  const raw=fs.readFileSync(path.join(ROOT,'tmp/pdfs/chromium.pdf'));
  const press=await PDFDocument.load(raw),P=press.getPages();if(P.length!==N)throw Error(`Expected ${N} pages, got ${P.length}`);
+ /* the US Letter format (game.json manual.format 'letter'): the pages as the game's CSS printed them, no bleed or crop marks; the booklet is two
+    Letter pages a side on Tabloid landscape, saddle-stitched (TUMBLER's rulebook was laid out for Letter) */
+ if((CFG.manual&&CFG.manual.format)==='letter'){
+  for(const p of P){if(Math.abs(p.getWidth()-612)>1||Math.abs(p.getHeight()-792)>1)throw Error(`a page prints at ${p.getWidth().toFixed(0)} x ${p.getHeight().toFixed(0)} pt, not US Letter: set @page { size: Letter }`);p.setTrimBox(0,0,612,792);p.setBleedBox(0,0,612,792);}
+  press.setTitle(`${TITLE} · Rules · US Letter edition`);press.setSubject(`${N} pages; US Letter`);press.setCreator('HTML/CSS via Playwright Chromium; PDF boxes and imposition via pdf-lib');
+  await fs.promises.writeFile(path.join(ROOT,`output/${SLUG}-print.pdf`),await press.save());
+  const booklet=await PDFDocument.create(),src=await PDFDocument.load(raw),order=[];
+  for(let i=0;i<N/4;i++)for(const pair of [[N-2*i,1+2*i],[2+2*i,N-1-2*i]]){order.push(pair);const pg=booklet.addPage([1224,792]);for(let j=0;j<2;j++){const e=await booklet.embedPage(src.getPage(pair[j]-1));pg.drawPage(e,{x:j*612,y:0,width:612,height:792});}}
+  booklet.setTitle(`${TITLE} · Tabloid booklet · duplex short-edge`);booklet.setSubject(`Print at actual size on 11 x 17 in landscape, duplex short-edge, fold and staple: ${N/4} sheets, a US Letter booklet.`);
+  await fs.promises.writeFile(path.join(ROOT,`output/${SLUG}-letter-booklet.pdf`),await booklet.save());
+  fs.writeFileSync(path.join(ROOT,'qa/imposition.json'),JSON.stringify({sheet:'Tabloid landscape',duplex:'short-edge',printScale:'100%',finishedSizeMm:[215.9,279.4],bleedMm:0,paperColor:paper,sheets:order},null,2));
+  console.log(JSON.stringify(audit,null,2));console.log('Built the US Letter press PDF and the Tabloid booklet.');
+  const rows=Object.entries(audit).filter(([k,v])=>/Rows$/.test(k)&&Array.isArray(v)).flatMap(([,v])=>v);
+  if(audit.missingImages.length||audit.overflow.length||audit.orphanCaptions.length||audit.orphanParagraphs.length||rows.some(row=>row.bottomDifferenceMm>.01))throw Error('the manual layout audit failed (manual/qa/layout.json)');
+  return;
+ }
  for(const p of P){
   p.setMediaBox(0,0,mm(192),mm(192));p.setTrimBox(mm(6),mm(6),mm(180),mm(180));p.setBleedBox(mm(3),mm(3),mm(186),mm(186));p.setCropBox(0,0,mm(192),mm(192));
   // Chromium rounds painted CSS edges. Paint the margins in PDF coordinates,

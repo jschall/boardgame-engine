@@ -7,6 +7,7 @@
 //     #shot=table&anim=N&speed=S    start the animation at speed S and pause after N turns
 //     window.__qa()                 -> {turn, over, illegal (count of rule violations the animation asserted), ...}
 //     window.__maxSnap              largest distance (mm) any piece would jump when the board is re-synced from the engine: the teleport metric, should stay near 0
+//                                   (the page measures it after every animated turn against the game's own re-pose; window.__snapWorst names the piece)
 // Usage:  node verify_anim.js page.html [--turns 12] [--speed 8] [--out anim-shots] [--every 4] [--timeout 600] [--snap 1.0]
 // Exit 1 on page errors, illegal moves, or __maxSnap above --snap.
 'use strict';
@@ -32,10 +33,10 @@ const PAGE = 'file://' + path.resolve(a[0]), TURNS = opt('--turns', 12), SPEED =
     if (q.over || ((q.turn || 0) >= TURNS && !stopAfter)) break;
   }
   await pg.waitForTimeout(1500); await pg.screenshot({ path: path.join(OUT, 'final.png') });
-  q = (await pg.evaluate('window.__qa ? window.__qa() : {}')) || {}; const snap = await pg.evaluate('window.__maxSnap || 0'); const logN = await pg.evaluate("document.querySelectorAll('.log .le, #log > *').length");
+  q = (await pg.evaluate('window.__qa ? window.__qa() : {}')) || {}; const snap = await pg.evaluate('window.__maxSnap || 0'), worst = await pg.evaluate('window.__snapWorst || null'); const logN = await pg.evaluate("document.querySelectorAll('.log .le, #log > *').length");
   await b.close();
   let bad = errs.length + (+q.illegal || 0) + (snap > SNAP ? 1 : 0);
-  console.log(JSON.stringify({ turns: q.turn, over: q.over, illegal: q.illegal || 0, maxSnap: +snap.toFixed(2), log_entries: logN, page_errors: errs.slice(0, 5), console_errors: cons.slice(0, 5), screenshots: k + 1, out: OUT }, null, 1));
+  console.log(JSON.stringify({ turns: q.turn, over: q.over, illegal: q.illegal || 0, maxSnap: +snap.toFixed(2), snapWorst: worst, log_entries: logN, page_errors: errs.slice(0, 5), console_errors: cons.slice(0, 5), screenshots: k + 1, out: OUT }, null, 1));
   if (t >= TIMEOUT) { console.log('TIMEOUT: the animation did not reach', TURNS, 'turns'); bad++; }
   process.exit(bad ? 1 : 0);
 })();

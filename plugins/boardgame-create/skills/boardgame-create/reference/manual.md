@@ -33,13 +33,13 @@ Not in the book: designer notes, thanks, marketing, "strategy tips" as filler, v
 ## How it looks
 
 - **Trim** 180 × 180 mm (fits inside the box under the lid; any size that fits the box inside the neck, with 3 mm bleed and crop marks for commercial output); 24 pages, six nested sheets, saddle-stitched, plus a letter-sized imposition for a home printer (`manual/build.js` with `pdf-lib`; `imposition-guide.html`).
-- **Type**: one friendly rounded family (Fredoka: medium body, semibold emphasis, bold display) embedded from the game's fonts; body 12.2 pt on 1.17 line height, captions 10.2 pt, page titles 23 pt, cover title 38 pt; short measures (two columns where a page is prose-heavy).
-- **Colour**: ink #302219 on paper #fffaf0, a wood tint #ead5af, one accent (honey #b47818) for rules borders and callouts, a rule line #c4ac83. Two-tone figures rendered from the parts on a wood swatch; the 3D cover shot uses each part's production material.
+- **Type**: the game's own family (the same `fonts/` as the page and the engraving: regular body, semibold emphasis, bold display), embedded; body around 12.2 pt on 1.17 line height, captions 10.2 pt, page titles 23 pt, cover title 38 pt; short measures (two columns where a page is prose-heavy). ORCHARD's Fredoka-on-cream is an example, not the rule.
+- **Colour**: a dark ink on a paper ground, one wood tint for figures, one accent for rules borders and callouts. Two-tone figures rendered from the parts on a wood swatch; the 3D cover shot uses each part's production material. The values live in the game's `manual/manual.css`.
 - **Hierarchy**: a kicker line (section · topic) above every page title; numbered steps for setup and the turn; question-and-answer blocks for rulings; a reference table for rewards; bold for terms on first use only.
 - **Figures**: from `manual/assets.js` (SVGs from `parts.json`, the cover shot from the page's renderer), at modest size, never hand-drawn, never stale: `verify.js` checks every asset against the current parts and the cover against a legal replay.
 - **The safety warning** in its own bordered band on the cover and the components page (sizes in `art.md`).
 - **Layout checks** (`review-layout.js`): no overflow on any page, no orphan words (`text-wrap: pretty`), no page over 100 % height, blank page markers hidden, the index fits.
-- **The page embeds it**: the engine's `page/manual-embed.js` inlines the built pages so the web page's rulebook modal shows the same pages (`game.json.manual.pages`) offline as a page-turning book; `analysis/page_check.js` compares the two.
+- **The page embeds it**: the engine's `page/manual-embed.js` inlines the built pages so the web page's rulebook modal shows the same pages (`game.json.manual.pages`) offline as a page-turning book; `engine/checks/page_check.js` and `page_gate.js` compare the two.
 
 ## The pipeline (keep as machinery)
 

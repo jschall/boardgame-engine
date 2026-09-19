@@ -2,8 +2,9 @@
 /* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
    This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 /* stats.js (boardgame-engine): self-play numbers for the page (stats.json) and the showcase game it animates (showcase.json), from any engine
-   that follows the sim contract: playGame(seed, players) -> a finished Game with .round, .log and .final(); drama(game) -> a number (the game's
-   own measure of a showcase: a close finish, its signature moments, a reasonable length), else the engine's default below.
+   that follows the sim contract: playGame(seed, players) -> a finished Game with .round, .log and .final(); optional stats(games, players) -> the
+   object written to stats.json; drama(game) -> a number (the game's own measure of a showcase: a close finish, its signature moments, a reasonable
+   length), else the engine's default below.
      node engine/bin/bg.js stats [games]           (400 four-player games are searched for the showcase; stats over `games` per player count) */
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -15,9 +16,14 @@ for (const k of ['playGame', 'RULES']) if (!(k in S)) throw new Error(`${simFile
 const players = (S.names && S.names.players && S.names.players.length) ? [2, 3, 4].filter(p => p <= S.names.players.length) : [2, 3, 4];
 const out = {};
 for (const p of players) {
-  const seats = new Array(p).fill(0); let rounds = 0, ties = 0, events = 0; const ends = {};
-  for (let s = 1; s <= games; s++) { const g = S.playGame(9000 + s, p); const f = g.final(); rounds += g.round; events += g.log.length; if (f.winner < 0) ties++; else seats[f.winner]++; ends[g.endReason || 'end'] = (ends[g.endReason || 'end'] || 0) + 1; }
-  out[p] = { games, players: p, rounds: +(rounds / games).toFixed(1), events: Math.round(events / games), ties: +(100 * ties / games).toFixed(0), seatWins: seats.map(n => +(100 * n / games).toFixed(0)), ends };
+  if (typeof S.stats === 'function') {
+    out[p] = S.stats(games, p);
+    if (!out[p] || typeof out[p] !== 'object') throw new Error(`${simFile}: stats(${games}, ${p}) did not return an object`);
+  } else {
+    const seats = new Array(p).fill(0); let rounds = 0, ties = 0, events = 0; const ends = {};
+    for (let s = 1; s <= games; s++) { const g = S.playGame(9000 + s, p); const f = g.final(); rounds += g.round; events += g.log.length; if (f.winner < 0) ties++; else seats[f.winner]++; ends[g.endReason || 'end'] = (ends[g.endReason || 'end'] || 0) + 1; }
+    out[p] = { games, players: p, rounds: +(rounds / games).toFixed(1), events: Math.round(events / games), ties: +(100 * ties / games).toFixed(0), seatWins: seats.map(n => +(100 * n / games).toFixed(0)), ends };
+  }
   console.error('players', p, JSON.stringify(out[p]));
 }
 fs.writeFileSync(path.join(GAME_DIR, 'stats.json'), JSON.stringify(out));

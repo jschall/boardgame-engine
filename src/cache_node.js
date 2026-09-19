@@ -10,11 +10,11 @@
 // draws the art starts a fresh cache. Usage: const store = require('./cache_node.js')(GAME_DIR); GAME.set_store(store); GAME.eng_store = store.
 'use strict';
 const fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto');
-const ENGINE = path.join(__dirname, '..');
-
 module.exports = function node_store(GAME_DIR, opts = {}) {
   const CFG = JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'game.json'), 'utf8'));
-  const SOURCES = CFG.geom_files.map(f => path.join(GAME_DIR, f)).concat(fs.readdirSync(path.join(ENGINE, 'fonts')).filter(f => f.endsWith('.ttf')).map(f => path.join(ENGINE, 'fonts', f)));
+  const fontDir = path.join(GAME_DIR, 'fonts');
+  if (!fs.existsSync(fontDir)) throw new Error('fonts/ is missing: the game supplies its typefaces (game.json.fonts)');
+  const SOURCES = CFG.geom_files.map(f => path.join(GAME_DIR, f)).concat(fs.readdirSync(fontDir).filter(f => /\.(ttf|otf)$/i.test(f)).map(f => path.join(fontDir, f)));
   const h = crypto.createHash('sha1');
   for (const f of SOURCES) h.update(fs.readFileSync(f));
   const src = h.digest('hex').slice(0, 16);

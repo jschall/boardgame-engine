@@ -60,7 +60,7 @@ Replace the game one file at a time, with the chain green after each:
 3. art.js and geom.js: the pieces (the parts spec: tiles, tokens, cards, boards, plates, standees on keyed bases, cross-lapped pairs in + holes) and the box's panels. Then \`bg parts\`, \`bg lint\`.
 4. rules.js: the lid text and the rulebook's pages; manual/figures.js names the figures. Then \`bg manual\`.
 5. table.js: the table layout and the animation of every event (the GameTable contract in engine/README.md). Then \`bg page\`, \`bg fit\`, \`bg check\`.
-6. page.js: the sheet catalogue and banned words; pack.js (optional): the piles; jigs.js (optional): extra glue jigs.
+6. page.js: the sheet catalogue and banned words; **page.css and fonts/**: this game's look (loading screen, type, colour — not ORCHARD's example); pack.js (optional): the piles; jigs.js (optional): extra glue jigs.
 7. design.md, iterations.md: the design record and every gauntlet round.
 
 The game is yours: the starter is public domain (CC0) and the engine's MPL-2.0 asks only that its own files keep their notices (engine/README.md, License). Add the LICENSE you choose.

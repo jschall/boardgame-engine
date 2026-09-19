@@ -8,6 +8,7 @@
   "maker": "made on a laser",
   "year": 2026,
   "code": "",
+  "fonts": { "family": "Fredoka", "R": "Fredoka-Medium.ttf", "SB": "Fredoka-SemiBold.ttf", "B": "Fredoka-Bold.ttf" },
   "geom": "geom.js",
   "geom_files": ["engine/lib/lasergeom.js", "engine/src/stock.js", "engine/src/shapes.js", "engine/src/box.js", "engine/src/geom.js", "orchard-sim.js", "rules.js", "art.js", "geom.js"],
   "manual": { "pages": 12 },

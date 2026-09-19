@@ -11,15 +11,25 @@
   const { Polygon, Point, LineString, box: sbox, unary_union, affinity, EMPTY, polys, hexagon, C, rrect, rounded, outline, text_min_stroke, twidth, centered } = lg;
   const D = stock.DESIGN, RAD = Math.PI / 180;
 
-  // ------------------------------------------------------------------ fonts: Fredoka (OFL), three weights, registered from bytes by the caller
-  const FONT = Object.freeze({ R: 'fredoka-medium', SB: 'fredoka-semibold', B: 'fredoka-bold' });
-  const FONT_FILES = Object.freeze({ [FONT.R]: 'Fredoka-Medium.ttf', [FONT.SB]: 'Fredoka-SemiBold.ttf', [FONT.B]: 'Fredoka-Bold.ttf' });
-  /** bytes = { 'Fredoka-Medium.ttf': Buffer | ArrayBuffer | base64, ... } */
-  function register_fonts(bytes) {
-    for (const [name, file] of Object.entries(FONT_FILES)) {
-      if (!bytes[file]) throw new Error('missing font ' + file);
-      if (!lg.has_font(name)) lg.register_font(name, bytes[file], { default: name === FONT.R });
+  // ------------------------------------------------------------------ fonts: the game's typefaces (game.json.fonts). R/SB/B are filled by register_fonts.
+  const FONT = { R: null, SB: null, B: null };
+  const FONT_FILES = {};
+  const font_stem = f => String(f).replace(/\.[^.]+$/, '').toLowerCase();
+  /** payload = { files: { 'Face-Regular.ttf': bytes }, roles: { R, SB, B } } from game.json.fonts. A flat map of files is not enough. */
+  function register_fonts(payload) {
+    if (!payload || typeof payload !== 'object') throw new Error('register_fonts: the game supplies { files, roles } (game.json.fonts)');
+    const files = payload.files || null, roles = payload.roles;
+    if (!files || typeof files !== 'object') throw new Error('register_fonts: payload.files is the filename -> bytes map');
+    if (!roles || !roles.R || !roles.SB || !roles.B) throw new Error('register_fonts: payload.roles needs R, SB, B filenames (game.json.fonts)');
+    FONT.R = font_stem(roles.R); FONT.SB = font_stem(roles.SB); FONT.B = font_stem(roles.B);
+    for (const k of Object.keys(FONT_FILES)) delete FONT_FILES[k];
+    FONT_FILES[FONT.R] = roles.R; FONT_FILES[FONT.SB] = roles.SB; FONT_FILES[FONT.B] = roles.B;
+    for (const [file, data] of Object.entries(files)) {
+      if (!data) throw new Error('missing font ' + file);
+      const name = font_stem(file);
+      if (!lg.has_font(name)) lg.register_font(name, data, { default: name === FONT.R });
     }
+    if (!lg.has_font(FONT.R) || !lg.has_font(FONT.SB) || !lg.has_font(FONT.B)) throw new Error('register_fonts: R, SB and B files must be in payload.files');
   }
 
   // ------------------------------------------------------------------ memo: art does not depend on stock thickness, so it is made once per process, and kept on disk with a store
@@ -204,9 +214,17 @@
 
   // ------------------------------------------------------------------ engraving helpers
   /** lettering as engraving with its strokes held at the laser's minimum: the everyday text call */
-  const ink = (s, size, x, y, o = {}) => text_min_stroke(s, size, x, y, { anchor: o.anchor || 'middle', font: o.font || FONT.SB, spacing: o.spacing || 0, min_line: 0.45 });
+  const ink = (s, size, x, y, o = {}) => {
+    const font = o.font || FONT.SB;
+    if (!font) throw new Error('ink: register the game fonts first (game.json.fonts)');
+    return text_min_stroke(s, size, x, y, { anchor: o.anchor || 'middle', font, spacing: o.spacing || 0, min_line: 0.45 });
+  };
   /** the biggest size at or under `size` at which `s` fits `width` */
-  const fit_text = (s, size, font, width, spacing = 0) => lg.fit_size(s, size, font || FONT.SB, width, spacing);
+  const fit_text = (s, size, font, width, spacing = 0) => {
+    const f = font || FONT.SB;
+    if (!f) throw new Error('fit_text: register the game fonts first (game.json.fonts)');
+    return lg.fit_size(s, size, f, width, spacing);
+  };
   /** parallel hatch lines over a region: pitch, line width, angle (degrees) */
   function hatch(region, pitch = 1.3, w = 0.5, ang = 45.0) {
     const [x0, y0, x1, y1] = region.bounds, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, R = Math.hypot(x1 - x0, y1 - y0) / 2 + pitch;

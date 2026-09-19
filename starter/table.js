@@ -86,6 +86,11 @@ function GameTable(api) {
   }
   let basketTok = [[], [], [], []];
   const supplyToken = type => { const t = tokens.find(t => t.where === 'supply' && t.type === type); if (!t) throw new Error(`no ${type} token left in the lid for the engine's move`); return t; };
+  /* a token going back to the lid takes the pocket setBoardFromState would free next: the tokens away from the lid are always the first of their kind
+     in list order (supplyToken takes the first one left), so the returning token trades index and pocket with the last one away */
+  const toSupply = tok => { const same = tokens.filter(t => t.type === tok.type), away = same.filter(t => t.where !== 'supply'), q = away[away.length - 1];
+    if (q && q !== tok) { const i = tokens.indexOf(tok), j = tokens.indexOf(q); tokens[i] = q; tokens[j] = tok; const h = tok.home; tok.home = q.home; q.home = h; }
+    tok.where = 'supply'; return tok.home; };
   async function flyToken(tok, dest, my, h = 60, ms = 650) { const a = [tok.inst.x, tok.inst.y, tok.inst.z]; const r0 = tok.inst.rot || 0; await tween(ms, u => { const p = arc(a, dest, u, h); tok.inst.x = p[0]; tok.inst.y = p[1]; tok.inst.z = p[2]; tok.inst.rot = r0 + ((dest[3] || 0) - r0) * u; }, my); }
   async function walk(c, to, my) { const P = farmers[c], a = [P.base.x, P.base.y, P.base.z], [x, y] = farmerXY(to); await tween(900, u => { const p = arc(a, [x, y, 3], u, 40); placeStandee(P, p[0], p[1], p[2]); P.fig.z += Math.abs(Math.sin(u * 12)) * 1.5 * Math.sin(Math.PI * u); }, my); }
   async function flyCard(cd, dest, deg, flip, my) { const a = [cd.inst.x, cd.inst.y, cd.inst.z], r0 = cd.inst.rot || 0; const [tx, ty] = rotXY(deg, CARD[0] / 2, CARD[1] / 2); await tween(700, u => { const p = arc(a, [dest[0] - tx, dest[1] - ty, dest[2]], u, 40); cd.inst.x = p[0]; cd.inst.y = p[1]; cd.inst.z = p[2]; cd.inst.rot = r0 + (deg - r0) * u; if (flip !== undefined && u > 0.5) cd.inst.flipped = flip; }, my); }
@@ -102,14 +107,14 @@ function GameTable(api) {
         if (qr() < .3) say(e.c, pick(e.full ? SAY.full : SAY.pick));
       } else if (e.type === 'drop') {
         log(e.scared ? `${dot(e.c)}The <b>crow</b> scares ${NAMES[e.c]}: a ${fruitName(e.fruit)} drops back into the lid.` : `${dot(e.c)}${NAMES[e.c]} puts a ${fruitName(e.fruit)} back.`, 'sys');
-        const j = basketTok[e.c].findIndex(t => t.type === e.fruit); const tok = basketTok[e.c].splice(j, 1)[0]; tok.where = 'supply'; await flyToken(tok, tok.home, my);
+        const j = e.at !== undefined ? e.at : basketTok[e.c].findIndex(t => t.type === e.fruit); const tok = basketTok[e.c].splice(j, 1)[0]; await flyToken(tok, toSupply(tok), my);   /* the slot the engine emptied: the basket stays in the engine's order */
         for (let k = 0; k < basketTok[e.c].length; k++) { const p = basketXY(e.c, k), t = basketTok[e.c][k]; Object.assign(t.inst, { x: p[0], y: p[1], z: p[2], rot: p[3] }); }
         if (qr() < .5) say(e.c, pick(SAY.drop));
       } else if (e.type === 'deliver') {
         const o = S.ORDERS[e.order]; log(`${dot(e.c)}<b>${NAMES[e.c]}</b> delivers <b>${o.name}</b> for ${e.pts} points${e.from === 'hand' ? ' (a secret order)' : ''}.`);
-        for (const k of e.gave) { const j = basketTok[e.c].findIndex(t => t.type === k); const tok = basketTok[e.c].splice(j, 1)[0]; tok.where = 'supply'; await flyToken(tok, tok.home, my, 70, 500); }
+        for (const k of e.gave) { const j = basketTok[e.c].findIndex(t => t.type === k); const tok = basketTok[e.c].splice(j, 1)[0]; await flyToken(tok, toSupply(tok), my, 70, 500); }
         for (let k = 0; k < basketTok[e.c].length; k++) { const p = basketXY(e.c, k), t = basketTok[e.c][k]; Object.assign(t.inst, { x: p[0], y: p[1], z: p[2], rot: p[3] }); }
-        const cd = cards[e.order], n = G.done[e.c].indexOf(e.order); const [x, y] = doneHome(e.c, n); cd.where = 'done'; await flyCard(cd, [x, y, n * STOCK_T('t15')], seatDeg(e.c), false, my);
+        const cd = cards[e.order], n = G.done[e.c].indexOf(e.order); const [x, y] = doneHome(e.c, n); cd.where = 'done'; await flyCard(cd, [x, y, n * STOCK_T('t15')], seatDeg(e.c), true, my);   /* delivered orders lie face down by the seat, as initTable lays them */
         /* the gap closes: each card still at the market, or still in that hand, slides to its new slot */
         const slides = [];
         for (const o of cards) {
@@ -127,7 +132,7 @@ function GameTable(api) {
         G.deck.forEach((oi, j) => { setPose(cards[oi].inst, [CARD[0] / 2, CARD[1] / 2], DECK[0], DECK[1], j * STOCK_T('t15'), 0); });
       } else if (e.type === 'steal') {
         log(`${dot(e.c)}The <b>crow</b> scares ${NAMES[e.from]}: a ${fruitName(e.fruit)} goes to <b>${NAMES[e.c]}</b>${e.full ? ', whose basket is now full' : ''}.`);
-        const j = basketTok[e.from].findIndex(t => t.type === e.fruit); const tok = basketTok[e.from].splice(j, 1)[0]; const k = basketTok[e.c].length; basketTok[e.c].push(tok); await flyToken(tok, basketXY(e.c, k), my, 80, 900);
+        const j = e.at !== undefined ? e.at : basketTok[e.from].findIndex(t => t.type === e.fruit); const tok = basketTok[e.from].splice(j, 1)[0]; const k = basketTok[e.c].length; basketTok[e.c].push(tok); await flyToken(tok, basketXY(e.c, k), my, 80, 900);
         for (let k2 = 0; k2 < basketTok[e.from].length; k2++) { const p = basketXY(e.from, k2), t = basketTok[e.from][k2]; Object.assign(t.inst, { x: p[0], y: p[1], z: p[2], rot: p[3] }); }
         if (qr() < .7) say(e.from, pick(SAY.scared));
       } else if (e.type === 'crow') {

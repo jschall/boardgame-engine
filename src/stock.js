@@ -93,8 +93,13 @@
     const GAP = box.gap || D.GAP; if (!(GAP >= 1.5 && GAP <= 6)) throw new Error(`box.gap (the shadow line) must be 1.5 to 6 mm, got ${GAP}`);
     const WALL_T = B.t + FIT.finger, OUT_X = INNER_X + 2 * WALL_T, OUT_Y = INNER_Y + 2 * WALL_T, OUT = OUT_X;
     /* the neck stands on the base floor, or NECK_ON above it (TUMBLER: on the board's pocket layer, which fills the floor under the neck) */
-    const NECK_ON = box.neck_on || 0; if (!(NECK_ON >= 0 && NECK_ON <= 12)) throw new Error(`box.neck_on must be 0 to 12 mm, got ${NECK_ON}`);
+    const NECK_ON = typeof box.neck_on === 'string' ? (S[box.neck_on] ? S[box.neck_on].t : NaN) : (box.neck_on || 0);   /* a number, or a stock key: that stock's built thickness (the layer it stands on) */
+    if (!(NECK_ON >= 0 && NECK_ON <= 12)) throw new Error(`box.neck_on must be 0 to 12 mm or a stock key, got ${box.neck_on}`);
     const NECK_H = 2 * WALL_H + GAP - 2 * (FLOOR_UP + B.t) - NECK_ON;
+    /* how the lid closes: the open tray turned over about the box's y axis ('y': the E and W walls trade places) or its x axis ('x': N and S trade),
+       the hinge of a lid laid open beside the base along x or along y. The lid's wall art is keyed by the closed position; the cut wall-<side>-lid
+       carries that art turned half a turn and stands at the opposite position of its pair in the open tray */
+    const LID_HINGE = box.lid_hinge || 'y'; if (!['x', 'y'].includes(LID_HINGE)) throw new Error(`box.lid_hinge must be 'x' or 'y', got ${box.lid_hinge}`);
     const WALL_SLOT_H = B.t + FIT.slot;
     /* the corner fingers: three bands a wall (the outer two to the S and N walls) while a band is 6 mm or more, else two (the rim band to the S and
        N walls: one chunky finger each, as TUMBLER's 12.5 mm walls were drawn); the neck likewise five bands or three */
@@ -113,7 +118,7 @@
       FLOOR_TAB: B.t + FIT.tab_proud, FLOOR_EDGE: FIT.finger, FLOOR_SPAN: INNER + 2 * FIT.finger, FLOOR_SPAN_X: INNER_X + 2 * FIT.finger, FLOOR_SPAN_Y: INNER_Y + 2 * FIT.finger,
       EASE: 0, TRAY: null, BASE_EASE: FIT.base_ease, LID_EASE: FIT.lid_ease, BAND_NOTCH: FIT.band_notch, CORE_RELIEF: FIT.core_relief,
       SLOT_W: D.TAB_W, WALL_SLOT_H, SLOT_Y0: WALL_H - FLOOR_UP - WALL_SLOT_H,
-      NECK_H, NECK_ON, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_SPLIT: box.neck_split || 0,   /* neck boards longer than this are cut as two halves meeting at a plain seam (a long box on a short sheet) */ NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
+      LID_HINGE, NECK_H, NECK_ON, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_SPLIT: box.neck_split || 0,   /* neck boards longer than this are cut as two halves meeting at a plain seam (a long box on a short sheet) */ NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
       NECK_OUT_X: INNER_X + 2 * FIT.finger - 2 * FIT.neck_cl, NECK_OUT_Y: INNER_Y + 2 * FIT.finger - 2 * FIT.neck_cl,
       JIG_CL: D.JIG_CL,
       /** a standee cut from stock `s` standing in a base or tile of stock `b`: its tab depth, and the slot it needs */

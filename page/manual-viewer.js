@@ -15,7 +15,18 @@
   pages.forEach((p, i) => p.setAttribute('aria-label', `Page ${i + 1}`));
   let leaves = [], single = false, cursor = 0, motion = null, pointer = null, frame = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const STRIPS = 7, LEAF_MM = 180, BEND = 42;   /* the bend across the leaf at the middle of a turn, degrees */
+  const STRIPS = 7, BEND = 42;   /* the bend across the leaf at the middle of a turn, degrees */
+  function leafWidthMm() {
+    const raw = getComputedStyle(book).getPropertyValue('--leaf-w').trim();
+    const v = parseFloat(raw);
+    if (!(v > 0)) throw Error('#book --leaf-w is not a length');
+    if (raw.endsWith('mm')) return v;
+    if (raw.endsWith('cm')) return v * 10;
+    if (raw.endsWith('in')) return v * 25.4;
+    if (raw.endsWith('px')) return v * 25.4 / 96;
+    throw Error('#book --leaf-w must be mm, cm, in or px');
+  }
+  const LEAF_MM = leafWidthMm();   /* the trimmed leaf, from the manual's format */
   const last = () => single ? count - 1 : count / 2;
   const pageNumber = () => single ? cursor + 1 : Math.max(1, cursor * 2);
   function paint() {
@@ -43,7 +54,7 @@
     cancelAnimationFrame(frame);
     if (motion) motion.curl.remove();
     motion = pointer = null;
-    single = stage.clientWidth < 820;
+    single = stage.clientWidth < LEAF_MM * 4.55;   /* two leaves would not fit at a readable scale (820 px for the 180 mm square) */
     book.classList.toggle('single', single);
     pages.forEach(p => { p.classList.remove('manual-back'); book.append(p); });
     leaves.forEach(l => l.remove());

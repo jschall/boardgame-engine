@@ -70,12 +70,18 @@ const INTERIOR_LOW = sbox(0, 0, K.INNER_X, K.INNER_Y);                  // under
 const NECK_RING = sbox(NECK_OFFSET, NECK_OFFSET, K.INNER_X - NECK_OFFSET, K.INNER_Y - NECK_OFFSET).difference(INTERIOR);
 
 /* a piece's stacking thickness: its stock's thickest reading plus the ply tolerance */
-function thick(pid) { const s = META.part_stock[pid]; if (!s || !META.stocks[s]) throw new Error(`${pid}: no stock in META.part_stock`); return META.stocks[s].t + PLY_TOL; }
+function thick0(pid) { const s = META.part_stock[pid]; if (!s || !META.stocks[s]) throw new Error(`${pid}: no stock in META.part_stock`); return META.stocks[s].t + PLY_TOL; }
+let GP_THICK = null;   /* the game's pack.js may give a piece's packed height (an assembled cat lying flat is its standing foot's 10 mm) */
+const thick = pid => { const v = GP_THICK ? GP_THICK(pid) : undefined; return v === undefined || v === null ? thick0(pid) : v + PLY_TOL; };
 
 // ------------------------------------------------------------------ what goes in (counts from the cut sheets)
 const counts = {};
-for (const s of Object.keys(LAYOUT).filter(s => /^sheet[1-9]\d*$/.test(s))) for (const it of LAYOUT[s].items) counts[it[0]] = (counts[it[0]] || 0) + 1;
-const BOX_PARTS = new Set(['floor-base', 'lid-cut', 'lid-outer', 'neck-A', 'neck-B']);
+const coupons = META.coupon_sheets || {};
+for (const s of Object.keys(LAYOUT)) {
+  if (coupons[s] || /^(backs-|jig-)/.test(s)) continue;
+  for (const it of LAYOUT[s].items) if (it[0]) counts[it[0]] = (counts[it[0]] || 0) + 1;
+}
+const BOX_PARTS = new Set(['floor-base', 'lid-cut', 'lid-outer', 'neck-A', 'neck-B', 'neck-A-half', 'neck-B-half']);
 const inventory = {};
 for (const [p, n] of Object.entries(counts)) if (!p.startsWith('wall-') && !p.startsWith('test-') && !BOX_PARTS.has(p) && p in OUTLINES) inventory[p] = n;
 const pool = Object.assign({}, inventory);
@@ -133,6 +139,7 @@ function default_columns() {
 }
 const ctx0 = { META, K, inventory, take, OUTLINES, thick, lg, kind_of, loaded_tray, stack_trays };
 const GP = GAME_PACK ? GAME_PACK(ctx0) : { columns: default_columns() };
+if (GP.thick) GP_THICK = GP.thick;
 let columns = GP.columns;
 columns = columns.map(([nm, st, pref]) => [nm, Array.isArray(st[0]) ? st : [[0.0, 0.0, st]], pref]);
 const left = Object.entries(pool).filter(([, n]) => n);
@@ -282,7 +289,7 @@ for (const pc of pieces) placed_counts[pc.pid] = (placed_counts[pc.pid] || 0) + 
 for (const [p, n] of Object.entries(inventory)) if ((placed_counts[p] || 0) !== n) problems.push(`${p}: ${placed_counts[p] || 0} packed of ${n}`);
 const INT_EXT = INTERIOR.exterior;
 for (const pc of pieces) {
-  const low = NECK_ON > 0 && pc.z + pc.t <= NECK_ON + 1e-6;   /* a layer the neck stands on: it may fill the tray */
+  const low = NECK_ON > 0 && pc.z + pc.t <= NECK_ON + PLY_TOL + 1e-6;   /* a layer the neck stands on: it may fill the tray */
   if (low) { if (!INTERIOR_LOW.buffer(0.01).contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the tray wall`); }
   else if (!INTERIOR.contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the neck ring`);
   else { const d = pc.geom.distance(INT_EXT); if (d < GAP_XY - 1e-6) problems.push(`${pc.pid} (${pc.pile}) is ${d.toFixed(2)} mm from the neck`); }

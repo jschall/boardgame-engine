@@ -24,20 +24,26 @@ module.exports = function build(GAME_DIR, argv) {
   const R3_JS = fs.readFileSync(path.join(ENGINE, 'lib', 'render3d.js'), 'utf8');
   const CUT_VIEW_JS = fs.readFileSync(path.join(ENGINE, 'src', 'cut_view.js'), 'utf8');
   const SHOW = JSON.parse(rd('showcase.json'));
-  const JIG = JSON.parse(rd('jig.json'));
+  const JIG = fs.existsSync(path.join(GAME_DIR, 'jig.json')) ? JSON.parse(rd('jig.json')) : null;   /* no jig yet (bg jig refused the box): the page shows no jig assembly or sheet */
+  if (!JIG) console.warn('page: no jig.json; the jig assembly and sheet are left out (run node engine/bin/bg.js jig)');
   const META = PJ.meta;
   const PACK_REPORT = JSON.parse(rd('packing.json'));
   const JV = require(path.join(ENGINE, 'src', 'jig_view.js'));
   const GP = require(path.join(GAME_DIR, 'page.js'))(CFG, PJ);   /* the game's page module: SHEET_GROUPS, banned words, an optional title */
   for (const k of ['SHEET_GROUPS']) if (!GP[k]) throw new Error(`page.js must export ${k}`);
   const SHEET_GROUPS = GP.SHEET_GROUPS;
-  /* the manual's fonts are the engine's: they sit beside its assets so manual.html opens from disk, and the bootstrap build (before the assets are captured) has them */
+  /* the game's typefaces (fonts/ + game.json.fonts) sit beside the manual so it opens from disk, and are embedded in the page */
+  const fonts = require(path.join(ENGINE, 'src', 'game_fonts.js'))(GAME_DIR, CFG);
+  if (!fs.existsSync(path.join(GAME_DIR, 'page.css'))) throw new Error('page.css is missing: the game styles the page (type, palette, loading screen); see starter/page.css');
   fs.mkdirSync(path.join(GAME_DIR, 'manual', 'assets'), { recursive: true });
-  for (const f of ['Fredoka-Medium.ttf', 'Fredoka-SemiBold.ttf', 'Fredoka-Bold.ttf', 'OFL.txt']) if (!fs.existsSync(path.join(GAME_DIR, 'manual', 'assets', f))) fs.copyFileSync(path.join(ENGINE, 'fonts', f), path.join(GAME_DIR, 'manual', 'assets', f));
+  for (const f of Object.keys(fonts.files)) {
+    const dest = path.join(GAME_DIR, 'manual', 'assets', f);
+    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(fonts.dir, f), dest);
+  }
+  if (fonts.license) { const dest = path.join(GAME_DIR, 'manual', 'assets', 'OFL.txt'); if (!fs.existsSync(dest)) fs.copyFileSync(fonts.license, dest); }
   const manual = require(path.join(ENGINE, 'page', 'manual-embed.js'))(GAME_DIR);
-  const CSS = fs.readFileSync(path.join(ENGINE, 'page', 'page.css'), 'utf8') + (fs.existsSync(path.join(GAME_DIR, 'page.css')) ? '\n' + rd('page.css') : '');
-  /* the hero title in Fredoka, the face of every engraved letter and of the manual, embedded so the page works from file:// */
-  const HERO_FONT = fs.readFileSync(path.join(ENGINE, 'fonts', 'Fredoka-SemiBold.ttf')).toString('base64');
+  const CSS = fs.readFileSync(path.join(ENGINE, 'page', 'page.css'), 'utf8') + '\n' + rd('page.css');
+  const HERO_FONT = fonts.files[fonts.hero].toString('base64');
   const PAGE_JS = fs.readFileSync(path.join(ENGINE, 'page', 'page.js'), 'utf8');
   const TABLE_JS = rd('table.js');
   for (const [name, text] of [['engine/page/page.js', PAGE_JS], ['table.js', TABLE_JS]]) if (/^\s*\/\//m.test(text)) throw new Error(`${name} has a // line comment: the page embeds it inline, where a line comment can swallow the rest of a line`);
@@ -107,8 +113,7 @@ module.exports = function build(GAME_DIR, argv) {
   }
 
   /* the geometry generator for the page's worker: game.json's geom_files in load order (the engine's library first, the game's geom.js last, which
-     sets the GameGeom global), and the Fredoka fonts as base64; null only with --no-geom. A missing file is an error. */
-  const FONT_FILES = ['Fredoka-Medium.ttf', 'Fredoka-SemiBold.ttf', 'Fredoka-Bold.ttf'];
+     sets the GameGeom global), and the game's fonts as { files, roles }; null only with --no-geom. A missing file is an error. */
   function geom_sources() {
     const files = CFG.geom_files.map(f => path.join(GAME_DIR, f));
     if (argv.includes('--no-geom')) return null;
@@ -116,11 +121,12 @@ module.exports = function build(GAME_DIR, argv) {
     if (missing.length) throw new Error(`the page's geometry generator needs ${missing.join(', ')} (or build with --no-geom)`);
     const sources = files.map(f => fs.readFileSync(f, 'utf8'));
     if (!/GameGeom/.test(sources[sources.length - 1])) throw new Error(`${CFG.geom_files[CFG.geom_files.length - 1]}: the last geometry file must set the GameGeom global`);
-    return { sources, fonts: Object.fromEntries(FONT_FILES.map(f => [f, fs.readFileSync(path.join(ENGINE, 'fonts', f)).toString('base64')])) };
+    const b64 = {}; for (const [f, buf] of Object.entries(fonts.files)) b64[f] = buf.toString('base64');
+    return { sources, fonts: { files: b64, roles: fonts.roles } };
   }
 
-  /* the page body: the stage with its one button (the box opens and closes on it; nothing scrolls), the nav, the rulebook modal (the book alone)
-     and the files modal (which also carries the rulebook's PDF links) */
+  /* the page body: the stage with its one button (the box opens and closes on it; nothing scrolls), the nav, the rulebook modal (the book
+     and its PDF links) and the files modal */
   const BODY = String.raw`
 <section id="demo">
       <div class="stage cwrap" id="stage">
@@ -148,13 +154,13 @@ module.exports = function build(GAME_DIR, argv) {
       <div class="manual-reader" id="manual-reader" role="region" aria-label="The rulebook. Click or swipe a page to turn it; the arrow keys turn pages too." tabindex="0">
         <div id="manual-stage"><div id="book"></div></div>
       </div>
+      @@RULEBOOK_RULES@@
     </section>
 </div></div>
 <div class="modal" id="modal-files" hidden><div class="modal-box wide">
     <button type="button" class="close" data-close="files" aria-label="Close">×</button>
     <section id="files">
       <h2>Laser files <small id="files-legend">300 × 450 mm sheets · kerf drawn into every cut: machine kerf compensation OFF · black engrave, yellow vector fill, blue score, orange corner marks, red cut</small></h2>
-      @@RULEBOOK_RULES@@
       @@STOCK@@
       <p id="sheet-status" role="status" hidden></p>
       <div class="sheets" id="sheets">@@SHEET_GROUPS@@</div>
@@ -167,7 +173,7 @@ module.exports = function build(GAME_DIR, argv) {
     body = rep(rep(rep(body, '@@TITLE@@', esc(CFG.name)), '@@TAGLINE@@', esc(CFG.tagline)), '@@META_LINE@@', esc(`${CFG.players[0]} to ${CFG.players[CFG.players.length - 1]} players · ${CFG.minutes} minutes`));
     const man = argv.includes('--no-manual') ? null : manual_links();
     const PAGES = CFG.manual && CFG.manual.pages; if (!Number.isInteger(PAGES) || PAGES % 4) throw new Error('game.json manual.pages (the rulebook page count, a multiple of four) is required');
-    body = rep(body, '@@RULEBOOK_RULES@@', man ? `<p class="rulebook-top">The rules as a printed booklet: the <a href="manual/${esc(man[0][0])}">rulebook</a> (trim size, with bleed) or the <a href="manual/${esc(man[1][0])}">US Letter fold-and-staple booklet</a>.</p>` : '<p class="rulebook-top">Bootstrap build: the rulebook PDFs are not built yet.</p>');
+    body = rep(body, '@@RULEBOOK_RULES@@', man ? `<p class="rulebook-top">Print the <a href="manual/${esc(man[0][0])}">rulebook</a> or the <a href="manual/${esc(man[1][0])}">fold-and-staple booklet</a>.</p>` : '<p class="rulebook-top">Bootstrap build: the rulebook PDFs are not built yet.</p>');
     const SHEETS_ALL = Object.assign({}, PJ.sheets);
     for (const sheet of SHEET_GROUPS.flatMap(g => g.sheets)) if (sheet.file) SHEETS_ALL[sheet.id] = rd(sheet.file);
     const PACK = PACK_REPORT.placements;
@@ -175,8 +181,8 @@ module.exports = function build(GAME_DIR, argv) {
     const sheetText = sheet_text_blocks(SHEETS_ALL);
     if (!Array.isArray(PACK)) throw new Error('packing.json has no placements list: rerun node engine/bin/bg.js pack');
     /* the jig shapes join the page's parts under prefixed ids so the viewer can show the jigs assembled; JIG carries the placements that stand them up */
-    const JIG_PARTS = JV.jig_parts(JIG), JIG_VIEW = JV.jig_view(JIG);
-    const jigStock = JV.jig_stock(JIG, META);
+    const JIG_PARTS = JIG ? JV.jig_parts(JIG) : {}, JIG_VIEW = JIG ? JV.jig_view(JIG) : null;
+    const jigStock = JIG ? JV.jig_stock(JIG, META) : null;
     const META_VIEW = Object.assign({}, META, { part_stock: Object.assign({}, META.part_stock, Object.fromEntries(Object.keys(JIG_PARTS).map(id => [id, jigStock]))) });
     const data = `const PARTS=${js(Object.assign({}, PJ.parts, JIG_PARTS))};\nconst LAYOUT=${js(PJ.layout)};\nconst SHEETS={};\nconst PACKING=${js(PACK)};\nconst META=${js(META_VIEW)};\nconst JIG=${js(JIG_VIEW)};\n\nconst SHOWCASE=${js(SHOW)};\n`;
     const geom = geom_sources();
@@ -186,7 +192,7 @@ module.exports = function build(GAME_DIR, argv) {
     const engCache = geom ? fs.readFileSync(ecf, 'utf8') : 'null';
     const geomData = geom ? `const GEOM_SOURCES=${js(geom.sources)};\nconst FONTS=${js(geom.fonts)};\nconst ENG_CACHE=${engCache.replace(/<\//g, '<\\/')};\n` : 'const GEOM_SOURCES=null;const FONTS=null;const ENG_CACHE=null;\n';
     return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>' + esc(GP.title || `${CFG.name} · a laser-cut board game for ${CFG.players[0]} to ${CFG.players[CFG.players.length - 1]} players`) + '</title>\n' +
-      `<style>@font-face { font-family: Fredoka; src: url(data:font/ttf;base64,${HERO_FONT}) format('truetype'); font-weight: 600; }\n${CSS}</style><style id="manual-style">${manual.styles()}</style></head><body><script>window.__manualPagesExpected = ${man ? PAGES : 0};</script>${body}\n${man ? manual.scripts() : `<script>window.__manualPageCount = 0; document.getElementById('book').innerHTML = '';</script>\n<script>${manual.viewerOnly()}</script>`}\n<script>${data}</script>\n<script>${geomData}</script>\n<script>${SIM_JS}\nwindow.GameSim = window.${simGlobal};</script>\n<script>${R3_JS}</script>\n<script>${CUT_VIEW_JS}</script>\n<script>${TABLE_JS}</script>\n<script>${PAGE_JS}</script>\n${sheetText}\n</body></html>\n`;
+      `<style>@font-face { font-family: ${esc(fonts.family)}; src: url(data:font/ttf;base64,${HERO_FONT}) format('truetype'); font-weight: 600; }\n${CSS}</style><style id="manual-style">${manual.styles()}</style></head><body><script>window.__manualPagesExpected = ${man ? PAGES : 0};</script>${body}\n${man ? manual.scripts() : `<script>window.__manualPageCount = 0; document.getElementById('book').innerHTML = '';</script>\n<script>${manual.viewerOnly()}</script>`}\n<script>${data}</script>\n<script>${geomData}</script>\n<script>${SIM_JS}\nwindow.GameSim = window.${simGlobal};</script>\n<script>${R3_JS}</script>\n<script>${CUT_VIEW_JS}</script>\n<script>${TABLE_JS}</script>\n<script>${PAGE_JS}</script>\n${sheetText}\n</body></html>\n`;
   }
 
   const out = outArg ? path.resolve(outArg) : path.join(GAME_DIR, `${CFG.slug}.html`);

@@ -1,8 +1,8 @@
-# Lessons from TUMBLER, SNOOZY HOLLOW and BUMBLE & BLOOM (2026-09-14)
+# Historical (do not follow as current)
+
+This is a 2026-09-14 transcript digest. **Page quotes here (scroll, Play/Pause, sticky stage, `geom/fits.js`) were superseded.** The live rules are `reference/standards.md` and `reference/page.md` (one button, nothing scrolls, no gameplay controls; box and fits live in `engine/src/`). The dated log is `reference/corrections.md`. Do not run a gauntlet from this file.
 
 The complete list of the owner's corrections, mined from every session transcript with dates and quotes, is `reference/corrections.md`; the checkable rules distilled from them are `reference/standards.md`.
-
-Everything the owner corrected, in their words, and the rule that came out of it. Read this before starting; each line was paid for.
 
 ## Process
 

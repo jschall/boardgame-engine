@@ -22,7 +22,9 @@ const PAGE = 'file://' + path.resolve(a[0]);
 const SCENES = a[1] ? JSON.parse(fs.readFileSync(a[1], 'utf8')) : [{ name: 'table, unstarted', hash: '', wait: 3000, inventory: true }];
 const SHEET_COUNTS = {};
 if (PARTS_FILE) { const PJ = JSON.parse(fs.readFileSync(PARTS_FILE, 'utf8'));
-  for (const [sname, L] of Object.entries(PJ.layout || {})) { if (sname.startsWith('backs') || SKIP.has(sname)) continue;
+  const skip = new Set(SKIP);
+  for (const s of Object.keys((PJ.meta && PJ.meta.coupon_sheets) || {})) skip.add(s);
+  for (const [sname, L] of Object.entries(PJ.layout || {})) { if (sname.startsWith('backs') || skip.has(sname)) continue;
     for (const [pid] of L.items || []) if (pid && !IGNORE.has(pid) && (PJ.parts[pid] || '').includes('#ff0000')) SHEET_COUNTS[pid] = (SHEET_COUNTS[pid] || 0) + 1; } }
 const norm = pid => { pid = ALIAS[pid] || pid; return pid.endsWith('-up') ? pid.slice(0, -3) : pid; };
 const CHECK = `(() => {

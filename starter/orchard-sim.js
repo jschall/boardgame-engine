@@ -109,7 +109,7 @@
   function dropWorst(g, p, want, have) {
     if (!(g.baskets[p].length >= g.rules.basket) || g.hand[p].concat(g.market).some(oi => g.canDeliver(p, oi))) return;
     let worst = 0, wv = Infinity; g.baskets[p].forEach((kk, j) => { const v = (want[kk] || 0) - (have[kk] || 0); if (v < wv) { wv = v; worst = j; } });
-    const kk = g.baskets[p].splice(worst, 1)[0]; g.supply[kk]++; g.emit({ type: 'drop', c: p, fruit: kk });
+    const kk = g.baskets[p].splice(worst, 1)[0]; g.supply[kk]++; g.emit({ type: 'drop', c: p, fruit: kk, at: worst });   /* at: which basket slot, so the table empties the same one */
   }
   function pickHere(g, p) {
     const t = g.farmers[p], k = g.trees[t];
@@ -132,8 +132,8 @@
     for (let q = 0; q < g.players; q++) if (g.farmers[q] === to && g.baskets[q].length) {
       const want = wantsOf(g, q, 1 + R.unfilled, 1), have = haveOf(g, q); let worst = 0, wv = Infinity; g.baskets[q].forEach((kk, j) => { const v = (want[kk] || 0) - (have[kk] || 0); if (v < wv) { wv = v; worst = j; } });
       const kk = g.baskets[q].splice(worst, 1)[0];
-      if (R.crowSteals && q !== p && g.baskets[p].length < R.basket) { g.baskets[p].push(kk); g.emit({ type: 'steal', c: p, from: q, fruit: kk, full: g.baskets[p].length === R.basket }); }
-      else { g.supply[kk]++; g.emit({ type: 'drop', c: q, fruit: kk, scared: true }); }
+      if (R.crowSteals && q !== p && g.baskets[p].length < R.basket) { g.baskets[p].push(kk); g.emit({ type: 'steal', c: p, from: q, fruit: kk, at: worst, full: g.baskets[p].length === R.basket }); }
+      else { g.supply[kk]++; g.emit({ type: 'drop', c: q, fruit: kk, at: worst, scared: true }); }
     }
     const trigger = g.done[p].length >= R.ordersToEnd ? 'orders' : FRUITS.some(f => g.supply[f.key] === 0) ? 'supply' : null;
     if (trigger && !g.endTriggered) { g.endTriggered = trigger; g.emit({ type: 'trigger', c: p, reason: trigger }); }

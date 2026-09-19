@@ -15,7 +15,7 @@ window.makeGuides=({pageCount,sheetCount,size,bleed})=>{
  document.getElementById('guides').innerHTML=Array.from({length:sheetCount*2},(_,side)=>{
   const sheet=Math.floor(side/2)+1,front=side%2===0;
   const pair=front?[pageCount-2*(sheet-1),1+2*(sheet-1)]:[2+2*(sheet-1),pageCount-1-2*(sheet-1)];
-  return `<section class="guide"><header><div class="title"><span>BUMBLE &amp; BLOOM · Print &amp; finish</span><span class="sheet-label">Sheet ${sheet} of ${sheetCount} · ${front?'FRONT':'BACK'} · pages ${pair.join(' | ')}</span></div>
+  return `<section class="guide"><header><div class="title"><span>Print &amp; finish</span><span class="sheet-label">Sheet ${sheet} of ${sheetCount} · ${front?'FRONT':'BACK'} · pages ${pair.join(' | ')}</span></div>
   <p><b>US Letter · Landscape · Actual size (100%) · Duplex: flip on short edge.</b></p>
   <p>Already imposed. Do not apply Booklet imposition, Fit or Scale to page.</p>
   <p>Pair fronts and backs by sheet number. Sheet 1 is outermost; sheet ${sheetCount} is innermost.</p></header>

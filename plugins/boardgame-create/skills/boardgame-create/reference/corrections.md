@@ -1,6 +1,6 @@
 # Corrections the owner made, 2026-09-14 to 2026-09-17
 
-Every entry is a message in which the owner corrected, rejected or redirected the assistant, or stated a rule, mined from the six session transcripts of the three games (TUMBLER, SNOOZY HOLLOW, BUMBLE & BLOOM). Dates are the transcript dates; quotes are verbatim. `reference/standards.md` distils the ones that recur into checkable standards; `reference/lessons.md` keeps the older narrative list. Read this before starting a game: each line is a mistake already made once.
+Every entry is a message in which the owner corrected, rejected or redirected the assistant, or stated a rule, mined from the six session transcripts of the three games (TUMBLER, SNOOZY HOLLOW, BUMBLE & BLOOM). Dates are the transcript dates; quotes are verbatim. `reference/standards.md` distils the ones that recur into checkable standards. `reference/lessons.md` is a historical digest: do not follow its page quotes after 2026-09-18 (scroll, Play/Pause). Read this before starting a game: each line is a mistake already made once. Later quotes in this file win when they contradict an earlier one (the button opening superseded the scroll page).
 
 ## Gameplay and design
 

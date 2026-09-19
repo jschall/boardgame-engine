@@ -299,11 +299,11 @@
     const mirrored = shape => K.back_art(shape, shape);
     const fl = floor_shape(FB), flL = floor_shape(FLD), flnom = memo(`box:floor:${SZ}`, () => floor_shape(F0));
     add('floor-base', fl);
-    const sc = (name, mirror) => { const g = panel_score(spec, name, INNER, INNER_Y); return g ? { score: K.score_lines(mirror ? K.back_art(flnom, g) : g) } : {}; };
+    const sc = (name, mirror) => { const g = panel_score(spec, name, INNER, INNER_Y); return g ? { score: K.score_lines(mirror ? K.back_art(flnom, g) : g) } : {}; };   /* mirror: only for a score drawn in the back frame (none of the panels) */
     keyed('floor-base-under', null, 'box:floor-under', () => base_under_art(spec, INNER, INNER_Y), Object.assign({ edge: flnom }, sc('base_under', false)));
-    keyed('floor-base-map', null, 'box:floor-map', () => base_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('base_inside', true)));
+    keyed('floor-base-map', null, 'box:floor-map', () => base_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('base_inside', false)));   /* the layout mirrors a back part's art and score lines onto the backs sheet: both are drawn as read */
     add('lid-cut', flL);
-    keyed('lid-inner', null, 'box:lid-inner', () => lid_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('lid_inside', true)));
+    keyed('lid-inner', null, 'box:lid-inner', () => lid_inner_art(spec, INNER, INNER_Y), Object.assign({ edge: mirrored(flnom), back: true }, sc('lid_inside', false)));
     keyed('lid-outer', null, 'box:lid-outer', () => lid_outer_art(spec, INNER, INNER_Y), Object.assign({ edge: flnom }, sc('lid_top', false)));
     const keep = (FT, y0, kind) => slot_boxes(y0, FT, kind).buffer(EDGE + 0.2, { join_style: 'mitre' });
     const wall_post = (FT, y0, kind) => { const sx = out_of(kind, FT) / out_of(kind, F0); return { eng_post: g => K.clip_out(sx === 1 ? g : affinity.scale(g, sx, 1, 1, [0, 0]), keep(FT, y0, kind)), eng_post_key: [sx, FT.SLOT_W, FT.WALL_T, FT.EASE, FT.WALL_SLOT_H, y0].concat(F.SQUARE ? [] : [kind, FT.FLOOR]).join('|') }; };

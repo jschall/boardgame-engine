@@ -19,7 +19,7 @@ scripts.forEach((src, i) => {
 const ids = ['demo', 'rules', 'art', 'files'].filter(s => s !== 'art' || html.includes('id="art"')); const pos = ids.map(s => html.indexOf(`id="${s}"`));
 if (pos.includes(-1)) bad.push('missing section id(s): ' + ids.filter((s, i) => pos[i] < 0).join(', '));
 else if (pos.some((p, i) => i && p < pos[i - 1])) bad.push('sections out of order: demo, rules, [art], files expected');
-/* the stage's views: the reference page (BUMBLE) has one stage with a nav (Rulebook, Parts, Laser files) and the parts panel over it; the older
+/* the stage's views: the engine page has one stage with a nav (Rulebook, Parts, Laser files) and the parts panel over it; older
    pages had tabs (data-mode="table" / "parts"). Either shape is complete. */
 const nav = html.includes('data-open="parts"') && html.includes('data-open="rules"') && html.includes('data-open="files"');
 if (!nav) for (const m of ['data-mode="table"', 'data-mode="parts"']) if (!html.includes(m)) bad.push('stage tab missing: ' + m + ' (or a nav with data-open="rules|parts|files")');

@@ -65,16 +65,28 @@ function scope(css) {
   }
   return out;
 }
+/* the leaf is the TRIMMED page, not the print sheet: 180 mm square, or a letter manual's inner .page (--trim-w / --trim-h) */
+function leaf() {
+  const cfg = JSON.parse(read('game.json'));
+  const css = read('manual/manual.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const w = css.match(/--trim-w\s*:\s*([^;}]+)/), h = css.match(/--trim-h\s*:\s*([^;}]+)/);
+  const letter = cfg.manual && cfg.manual.format === 'letter';
+  if (letter) {
+    if (!w || !h) throw Error('letter format: set --trim-w and --trim-h in manual/manual.css to the inner page (the Letter sheet is print paper, not the book)');
+    return `#book { --leaf-w:${w[1].trim()}; --leaf-h:${h[1].trim()}; }\n`;
+  }
+  return `#book { --leaf-w:180mm; --leaf-h:180mm; }\n`;
+}
 function styles() {
   const css = read('manual/manual.css').replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/url\((assets\/[^)]+)\)/g, (_, file) => `url(${uri(file)})`)
     .replace(/\bFredoka\b/g, 'ManualFredoka');
-  return '#book, #book :where(:not(svg, svg *)) { all:revert; box-sizing:border-box; }\n' + scope(css) + readEngine('manual-viewer.css');
+  return '#book, #book :where(:not(svg, svg *)) { all:revert; box-sizing:border-box; }\n' + leaf() + scope(css) + readEngine('manual-viewer.css');
 }
 function scripts() {
   const assets = Object.fromEntries(fs.readdirSync(path.join(GAME_DIR, 'manual/assets')).filter(f => /\.(svg|png)$/.test(f)).sort().map(f => ['assets/' + f, uri('assets/' + f)]));
   /* the manual's data files: rules-data.js (from the engine's sync) and any assets/*-data.js the game's figures read */
-  const dataFiles = ['manual/rules-data.js'].concat(fs.readdirSync(path.join(GAME_DIR, 'manual/assets')).filter(f => /-data\.js$/.test(f)).sort().map(f => 'manual/assets/' + f));
+  const dataFiles = (fs.existsSync(path.join(GAME_DIR, 'manual/rules-data.js')) ? ['manual/rules-data.js'] : []).concat(fs.readdirSync(path.join(GAME_DIR, 'manual/assets')).filter(f => /-data\.js$/.test(f)).sort().map(f => 'manual/assets/' + f));   /* rules-data.js only when the game syncs its rules */
   const safe = text => text.replace(/<\//g, '<\\/');
   /* Render through a small DOM adapter so even SVG <image> URLs are replaced
      before the browser sees markup. The generator itself is unchanged. */

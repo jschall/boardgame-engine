@@ -40,8 +40,13 @@ async function main() {
     const source = fs.readFileSync(path.join(root, 'manual', name)), embedded = Buffer.from(data.split(',')[1], 'base64');
     assert.deepEqual(name.endsWith('.png') ? pixels(embedded) : embedded, name.endsWith('.png') ? pixels(source) : source, name);
   }
-  for (const weight of ['Medium', 'SemiBold', 'Bold']) assert(html.includes(fs.readFileSync(path.join(root, 'manual/assets', `Fredoka-${weight}.ttf`)).toString('base64')));
-  pass('Every manual SVG, the lossless PNGs and three Fredoka weights are embedded');
+  const fontSpec = CFG.fonts; if (!fontSpec || !fontSpec.R || !fontSpec.SB || !fontSpec.B) throw new Error('game.json.fonts { family, R, SB, B } is required');
+  for (const role of ['R', 'SB', 'B']) {
+    const f = fontSpec[role], p = path.join(root, 'manual/assets', f);
+    assert(fs.existsSync(p), `manual/assets/${f} (game.json.fonts.${role})`);
+    assert(html.includes(fs.readFileSync(p).toString('base64')), `the page embeds ${f}`);
+  }
+  pass('Every manual SVG, the lossless PNGs and the game\'s three font weights are embedded');
   /* the machine's GPU when headless Chromium can reach it (PAGE_CHECK_GPU=1), else the software rasterizer */
   const browser = await require('./browser.js').launch();
   const errors = [], external = [];
@@ -59,11 +64,12 @@ async function main() {
     /* the page: one stage that is the whole viewport, then the two modals; nothing else */
     assert.deepEqual(await pg.locator('body > section, body > main, body > header, body > .modal').evaluateAll(es => es.map(e => e.id || e.tagName)), ['demo', 'modal-rules', 'modal-files']);
     assert.deepEqual(await pg.locator('#modal-rules > .modal-box > section, #modal-files > .modal-box > section').evaluateAll(es => es.map(e => e.id)), ['rules', 'files']);
-    for (const sel of ['#btn-play', '#btn-new', '#speed', '#btn-view', '.tabs', '[data-mode]', '.pill', 'header.hero', '#below', '#manual-zoom', '#btn-lift', '#track', '#cue', '#btn-skip', '.manual-toolbar', '#manual-help', '#manual-prev', '#manual-next', '#manual-page', '#rules > h2', '#rules > p', '#rules > .rulebook-top']) assert.equal(await pg.locator(sel).count(), 0, 'no ' + sel);
+    for (const sel of ['#btn-play', '#btn-new', '#speed', '#btn-view', '.tabs', '[data-mode]', '.pill', 'header.hero', '#below', '#manual-zoom', '#btn-lift', '#track', '#cue', '#btn-skip', '.manual-toolbar', '#manual-help', '#manual-prev', '#manual-next', '#manual-page', '#rules > h2', '#rules > p:not(.rulebook-top)']) assert.equal(await pg.locator(sel).count(), 0, 'no ' + sel);
     assert.deepEqual(await pg.locator('#nav button').evaluateAll(es => es.map(e => [e.dataset.open, e.textContent])), [['rules', 'Rulebook'], ['parts', 'Parts'], ['files', 'Laser files']]);
     assert.equal(await pg.locator('#stage > canvas#c3d, #stage > #btn-box, #stage > #intro-title h1, #stage > #nav, #stage > .hud > #chips, #stage > .hud > #log, #stage > #panel[hidden], #stage > #loading').count(), 8, 'the stage: canvas, the box button, title, nav, chips and log in the HUD, the parts panel closed, the loading screen');
     assert.deepEqual(await pg.locator('#log').evaluate(e => [getComputedStyle(e).overflowY, getComputedStyle(e).pointerEvents]), ['hidden', 'none'], 'the log neither scrolls under the wheel nor takes the pointer');
-    assert.equal(await pg.locator('#modal-files a[href*="manual/output"]').count(), 2, 'the two PDF links, once each, in the files modal (the rulebook modal is the book alone)');
+    assert.equal(await pg.locator('#modal-rules a[href*="manual/output"]').count(), 2, 'the two PDF links, once each, under the book in the rulebook modal');
+    assert.equal(await pg.locator('#modal-files a[href*="manual/output"]').count(), 0, 'the files modal does not also link the PDFs');
     const GP = require(path.join(root, 'page.js'))(CFG, JSON.parse(fs.readFileSync(path.join(root, 'parts/parts.json'))));
     const expected = GP.SHEET_GROUPS.flatMap(g => g.sheets.flatMap(s => [s.id].concat(s.back ? [s.back] : []))).sort();
     assert.deepEqual(await pg.locator('#sheets .sheet').evaluateAll(es => es.map(e => e.dataset.sheetId).sort()), expected);
@@ -103,7 +109,7 @@ async function main() {
     await pg.reload(); await ready(); await frame();
     await pg.evaluate(() => { window.__intro.rate = 4; });   /* four times the pace, so the check takes seconds */
     await pg.locator('#btn-box').click();
-    await pg.waitForFunction(() => window.__intro.dir > 0 && window.__intro.p > 0.45, null, { timeout:20000 });
+    await pg.waitForFunction(() => window.__intro.dir > 0 && window.__intro.p > 0.45, null, { timeout:20000 }).catch(async e => { throw new Error(`the box did not open on the button: ${await pg.evaluate(() => JSON.stringify({ p: window.__intro.p, dir: window.__intro.dir, live: window.__intro.live, ready: window.__intro.ready, open: window.__intro.open, button: document.getElementById('btn-box').hidden }))}`); });
     assert.equal(await pg.locator('#btn-box').textContent(), 'Close the box');
     assert.equal(await pg.evaluate(() => document.getElementById('stage').getBoundingClientRect().top), 0, 'the stage stays put');
     await shot('#stage', 'stage-opening.png');
@@ -135,6 +141,7 @@ async function main() {
     /* the rulebook modal: the real manual, page turning, keyboard, index links, phones */
     await pg.reload(); await ready(); await frame();
     await pg.locator('#nav [data-open="rules"]').click(); assert(await pg.locator('#modal-rules').isVisible());
+    await pg.waitForFunction(() => window.__manual && window.__manual.single === false);
     const outside = () => [...document.querySelectorAll('#log, #nav button, #files h2, #sheets .sheet')].map(e => { const s = getComputedStyle(e); return [s.color, s.font, s.margin, s.padding, s.width, s.backgroundColor]; });
     const before = await pg.evaluate(outside);
     await pg.evaluate(() => document.getElementById('manual-style').disabled = true);
@@ -217,7 +224,8 @@ async function main() {
     await pg.locator('#panel [data-close="parts"]').click();
     assert.equal(await pg.evaluate(() => window.__qa().mode), 'table'); assert(!(await pg.locator('#panel').isVisible()));
     await pg.locator('#nav [data-open="files"]').click(); assert(await pg.locator('#modal-files').isVisible());
-    const firstSheet = expected.find(s => /^sheet\d+$/.test(s));
+    const firstSheet = await pg.locator('#production-sheets .sheet[data-generated="true"]').first().getAttribute('data-sheet-id');
+    assert(firstSheet, 'a generated production sheet to regenerate');
     const old = await pg.locator(`#sheets [data-sheet-id="${firstSheet}"] a`).getAttribute('href');
     const kerfKey = await pg.evaluate(() => Object.values(META.stocks)[0].params.kerf);
     await pg.evaluate(k => window.__setStock({ [k]: 0.19 }), kerfKey);

@@ -1,30 +1,31 @@
 /* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
    This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-/* These rules only present the generated paper pages; typography lives in the manual. */
+/* These rules only present the generated paper pages; typography lives in the manual. The leaf is --leaf-w by --leaf-h (set on #book by
+   manual-embed from game.json manual.format: 180 mm square by default, US Letter portrait for 'letter'). */
 .manual-reader { border-radius:16px; background:#e6d7b9; padding:10px 16px 14px; outline-offset:5px; }
 #manual-stage { position:relative; width:100%; overflow:hidden; touch-action:pan-y pinch-zoom; }
-#book { position:absolute; left:50%; top:28px; width:360mm; height:180mm; margin:0; background:transparent; perspective:5000px; transform-origin:top center; transform:translateX(calc(-50% + var(--book-shift, 0px))) scale(var(--book-scale, 1)); transition:transform .65s ease; isolation:isolate; }
-#book.single { width:180mm; }
-#book .manual-leaf { position:absolute; width:180mm; height:180mm; top:0; left:180mm; transform-origin:left center; transform-style:preserve-3d; }
+#book { position:absolute; left:50%; top:28px; width:calc(2 * var(--leaf-w)); height:var(--leaf-h); margin:0; background:transparent; perspective:5000px; transform-origin:top center; transform:translateX(calc(-50% + var(--book-shift, 0px))) scale(var(--book-scale, 1)); transition:transform .65s ease; isolation:isolate; }
+#book.single { width:var(--leaf-w); }
+#book .manual-leaf { position:absolute; width:var(--leaf-w); height:var(--leaf-h); top:0; left:var(--leaf-w); transform-origin:left center; transform-style:preserve-3d; }
 #book.single .manual-leaf { left:0; }
-#book .sheet, #book .manual-verso { position:absolute; inset:0; width:180mm; height:180mm; margin:0; padding:0; border:0; border-radius:0 2px 2px 0; background:var(--paper); backface-visibility:hidden; box-shadow:0 2px 3px #38260940, 0 8px 18px #38260924; overflow:hidden; }
+#book .sheet, #book .manual-verso { position:absolute; inset:0; width:var(--leaf-w); height:var(--leaf-h); margin:0; padding:0; border:0; border-radius:0 2px 2px 0; background:var(--paper); backface-visibility:hidden; box-shadow:0 2px 3px #38260940, 0 8px 18px #38260924; overflow:hidden; }
 #book .manual-back { transform:rotateY(180deg); border-radius:2px 0 0 2px; }
-#book .page { left:0; top:0; }
+#book .page { left:0; top:0; width:var(--leaf-w); height:var(--leaf-h); }   /* the inner page fills the trimmed leaf; print bleed and Letter margins stay off-screen */
 #book .bleed { inset:0; }
 #book .sheet::after, #book .manual-verso::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
 #book .manual-back::after { background:linear-gradient(270deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
 /* the turning leaf: strips hinged one on the next (the nesting composes their turns), each showing its slice of the front and, turned over, of
    the back; a strip's shade follows the way it faces; the leaf's own drop shadow is off while it is in the air and a soft shadow lies on the
    table under it instead */
-#book .manual-curl { position:absolute; top:0; left:180mm; width:180mm; height:180mm; transform-style:preserve-3d; pointer-events:none; }
+#book .manual-curl { position:absolute; top:0; left:var(--leaf-w); width:var(--leaf-w); height:var(--leaf-h); transform-style:preserve-3d; pointer-events:none; }
 #book.single .manual-curl { left:0; }
-#book .manual-strip { position:absolute; top:0; height:180mm; transform-origin:0 50%; transform-style:preserve-3d; will-change:transform; }
+#book .manual-strip { position:absolute; top:0; height:var(--leaf-h); transform-origin:0 50%; transform-style:preserve-3d; will-change:transform; }
 #book .manual-face { position:absolute; inset:0; overflow:hidden; backface-visibility:hidden; background:var(--paper); }
 #book .manual-face-back { transform:rotateY(180deg); }
-#book .manual-face .manual-clone { position:absolute; top:0; width:180mm; height:180mm; box-shadow:none; transform:none; border-radius:0; backface-visibility:visible; }
+#book .manual-face .manual-clone { position:absolute; top:0; width:var(--leaf-w); height:var(--leaf-h); box-shadow:none; transform:none; border-radius:0; backface-visibility:visible; }
 #book .manual-face .manual-clone::after { display:none; }
 #book .manual-face::after { content:''; position:absolute; inset:0; pointer-events:none; background:#2a1a08; opacity:var(--shade, 0); }
-#book .manual-ground { position:absolute; top:0; height:180mm; transform:translateZ(-0.4px); pointer-events:none; opacity:0; background:linear-gradient(90deg,#3a2608cc,#3a260855 70%,#3a260800); filter:blur(7px); }
+#book .manual-ground { position:absolute; top:0; height:var(--leaf-h); transform:translateZ(-0.4px); pointer-events:none; opacity:0; background:linear-gradient(90deg,#3a2608cc,#3a260855 70%,#3a260800); filter:blur(7px); }
 #book .manual-ground.left { background:linear-gradient(270deg,#3a2608cc,#3a260855 70%,#3a260800); }
 #book a:focus-visible { outline:2px solid var(--honey); outline-offset:2px; }
 #book img { -webkit-user-drag:none; }

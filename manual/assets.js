@@ -62,9 +62,9 @@ async function main(GAME_DIR) {
     await pg.close();
   }
   if (typeof figures.extra === 'function') await figures.extra({ P, materials, ROOT, GAME_DIR, browser, meta });
-  const FONTS = path.join(__dirname, '..', 'fonts');
-  for (const font of ['Fredoka-Medium.ttf', 'Fredoka-SemiBold.ttf', 'Fredoka-Bold.ttf']) fs.copyFileSync(path.join(FONTS, font), path.join(ROOT, 'assets', font));
-  fs.writeFileSync(path.join(ROOT, 'assets', 'OFL.txt'), fs.readFileSync(path.join(FONTS, 'OFL.txt'), 'utf8').replace(/[ \t]+$/gm, ''));
+  const fonts = require('../src/game_fonts.js')(GAME_DIR, CFG);
+  for (const f of Object.keys(fonts.files)) fs.copyFileSync(path.join(fonts.dir, f), path.join(ROOT, 'assets', f));
+  if (fonts.license) fs.writeFileSync(path.join(ROOT, 'assets', 'OFL.txt'), fs.readFileSync(fonts.license, 'utf8').replace(/[ \t]+$/gm, ''));
   for (const [f, hash] of Object.entries(meta.sha256)) if (crypto.createHash('sha256').update(fs.readFileSync(path.join(GAME_DIR, f))).digest('hex') !== hash) throw Error('Source regenerated during capture; rerun assets.js: ' + f);
   fs.writeFileSync(path.join(ROOT, 'assets', 'provenance.json'), JSON.stringify(meta, null, 2) + '\n');
   await browser.close(); console.log(`Refreshed ${meta.parts.length} real part drawings and ${Object.keys(meta.renders).length} 3D renders.`);

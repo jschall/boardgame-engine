@@ -47,14 +47,27 @@
     list.push(posed(which === 'base' ? mk({ part: part('floor-base'), back: part('floor-base-under'), x: ox, y: oy }) : mk({ part: part('lid-cut'), back: part('lid-outer'), x: ox, y: oy }), D => ({ z: D.FU })));
     walls(list, ox, oy, which, 'WH');
   }
+  /* the lid closes turned over about the box's y axis (META.LID_HINGE 'y', the default: E and W trade places) or its x axis ('x': N and S trade);
+     a cut lid wall is keyed by its closed position, so in the open tray it stands at its pair's opposite position */
+  const HINGE = META.LID_HINGE || 'y', SWAP = HINGE === 'x' ? { S: 'N', N: 'S', E: 'E', W: 'W' } : { S: 'S', N: 'N', E: 'W', W: 'E' };
+  const lidClosed = (ox, oy) => HINGE === 'x' ? { flipped: true, rot: 0, x: ox, y: oy } : { flipped: true, rot: 180, x: ox + IX, y: oy + IY };   /* the closed lid panel: the open one turned over about the hinge axis */
   function walls(list, ox, oy, which, zkey) {
-    const w = s => part(`wall-${s}-${which}`), at = D => { const e = easeOf(D, which); return [ox - e, oy - e, IX + 2 * e, IY + 2 * e]; };   /* this tray's inside corner and spans */
+    const w = s => part(`wall-${which === 'lid' ? SWAP[s] : s}-${which}`), at = D => { const e = easeOf(D, which); return [ox - e, oy - e, IX + 2 * e, IY + 2 * e]; };   /* this tray's inside corner and spans */
     list.push(posed(mk({ part: w('S'), vertical: true, rot: 0 }), D => { const [x0, y0, , J] = at(D); return { x: x0 - D.WT, y: y0 + J + D.WT - D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('E'), vertical: true, rot: -90 }), D => { const [x0, y0, I, J] = at(D); return { x: x0 + I + D.WT - D.T3 / 2, y: y0 + J + D.WT, z: D[zkey] }; }),
       posed(mk({ part: w('N'), vertical: true, rot: 180 }), D => { const [x0, y0, I] = at(D); return { x: x0 + I + D.WT, y: y0 - D.WT + D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('W'), vertical: true, rot: 90 }), D => { const [x0, y0] = at(D); return { x: x0 - D.WT + D.T3 / 2, y: y0 - D.WT, z: D[zkey] }; }));
   }
+  /* a neck board standing from its near end along rot: the whole board, or the two halves a long box's sheet forced (neck_split: the board is
+     symmetric, so the same half serves both ends, the second turned end for end at the far end of the same line) */
+  function board(list, kind, rot, at, len) {
+    if (PARTS[`neck-${kind}`]) { list.push(posed(mk({ part: part(`neck-${kind}`), vertical: true, rot }), at)); return; }
+    const rad = rot * Math.PI / 180, dx = Math.cos(rad), dy = Math.sin(rad);
+    list.push(posed(mk({ part: part(`neck-${kind}-half`), vertical: true, rot }), at),
+      posed(mk({ part: part(`neck-${kind}-half`), vertical: true, rot: rot + 180 }), D => { const p = at(D), l = len(D); return { x: p.x + dx * l, y: p.y + dy * l, z: p.z }; }));
+  }
   function neck(list, ox, oy, zkey) {
-    list.push(posed(mk({ part: part('neck-A'), vertical: true, rot: 0 }), D => ({ x: ox + D.NCL, y: oy + IY - D.NCL - D.TW / 2, z: D[zkey] })), posed(mk({ part: part('neck-A'), vertical: true, rot: 180 }), D => ({ x: ox + IX - D.NCL, y: oy + D.NCL + D.TW / 2, z: D[zkey] })),
-      posed(mk({ part: part('neck-B'), vertical: true, rot: -90 }), D => ({ x: ox + IX - D.NCL - D.TW / 2, y: oy + IY - D.NCL, z: D[zkey] })), posed(mk({ part: part('neck-B'), vertical: true, rot: 90 }), D => ({ x: ox + D.NCL + D.TW / 2, y: oy + D.NCL, z: D[zkey] })));
+    const LA = D => IX - 2 * D.NCL, LB = D => IY - 2 * D.NCL;   /* the boards' outer lengths */
+    board(list, 'A', 0, D => ({ x: ox + D.NCL, y: oy + IY - D.NCL - D.TW / 2, z: D[zkey] }), LA); board(list, 'A', 180, D => ({ x: ox + IX - D.NCL, y: oy + D.NCL + D.TW / 2, z: D[zkey] }), LA);
+    board(list, 'B', -90, D => ({ x: ox + IX - D.NCL - D.TW / 2, y: oy + IY - D.NCL, z: D[zkey] }), LB); board(list, 'B', 90, D => ({ x: ox + D.NCL + D.TW / 2, y: oy + D.NCL, z: D[zkey] }), LB);
   }
 
 
@@ -68,7 +81,7 @@
   function addAsm(id, group, name, desc, rep, build, opts) { ASMS[id] = Object.assign({ group, name, desc, rep, build }, opts || {}); }
   function trayEx(L, which) { const i0 = L.length; tray(L, 0, 0, which); exFor(L[i0]); [[0, 45, 0], [45, 0, 0], [0, -45, 0], [-45, 0, 0]].forEach((d, i) => exFor(L[i0 + 1 + i], d)); }
   function neckEx(L, dz) { const i0 = L.length; neck(L, 0, 0, 'NECK_TOP'); L.slice(i0).forEach(n => exFor(n, [0, 0, dz])); }
-  function lidOn(L) { const i0 = L.length; L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IX, y: IY }), D => ({ z: D.LID_FLOOR }))); walls(L, 0, 0, 'lid-up', 'LID_TOP'); L.slice(i0).forEach(x => exFor(x, [0, 0, 110])); }
+  function lidOn(L) { const i0 = L.length; L.push(posed(mk(Object.assign({ part: part('lid-cut'), back: part('lid-outer') }, lidClosed(0, 0))), D => ({ z: D.LID_FLOOR }))); walls(L, 0, 0, 'lid-up', 'LID_TOP'); L.slice(i0).forEach(x => exFor(x, [0, 0, 110])); }
 
   /* ------------------------------------------------------------ timing (declared before the game, whose animations call tween and wait) */
   let paused = true, speed = 1, runId = 0, lifted = 0; const CANCEL = { cancel: true };
@@ -93,6 +106,8 @@
   const GT = GameTable(api);
   for (const k of ['NP', 'players', 'T', 'BOXO', 'LIDO', 'BOXA', 'LIDA', 'initTable', 'setBoardFromState', 'animateEvents', 'resetShown', 'syncShown', 'syncBoard', 'finale', 'clearTable']) if (GT[k] === undefined) throw new Error(`GameTable returned no ${k}: table.js must provide it (engine/README.md)`);
   const NP = GT.NP, NAMES = GT.players.map(p => p.name), COLC = GT.players.map(p => p.colour), T = GT.T, BOXO = GT.BOXO, LIDO = GT.LIDO, BOXA = GT.BOXA, LIDA = GT.LIDA;
+  const DARK = '#120c07';   /* the void the closed boxes stand in, until the lights come up on the table */
+  scene.opts.table = DARK;
   if (NAMES.length < NP) throw new Error(`GameTable.players names ${NAMES.length} seats for a ${NP}-player table`);
   const dot = c => `<span class="dot" style="--c:${COLC[c]}"></span>`;
   const say = (c, line) => log(`<span class="who">${NAMES[c]}:</span> “${line}”`, 'say');
@@ -110,7 +125,7 @@
   /* ------------------------------------------------------------ the box (machinery for the shoulder box) */
   const B = { static: [], dynamic: [], lid: [], home: { pitch: 72, yaw: -32, dist: 1400, cx: IX / 2, cy: IY / 2, cz: 26, view: 330 * Math.max(1, Math.max(IX, IY) / 190) } };   /* low enough to see the shadow line */
   tray(B.static, 0, 0, 'base'); neck(B.static, 0, 0, 'NECK_TOP');
-  B.lid.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IX, y: IY }), D => ({ z: D.LID_FLOOR }))); walls(B.lid, 0, 0, 'lid-up', 'LID_TOP');
+  B.lid.push(posed(mk(Object.assign({ part: part('lid-cut'), back: part('lid-outer') }, lidClosed(0, 0))), D => ({ z: D.LID_FLOOR }))); walls(B.lid, 0, 0, 'lid-up', 'LID_TOP');
   B.lid.forEach(i => i.z0 = i.z); B.dynamic = B.lid;
   /* the assemblies every game has, after the game's own: each standee on its base (META.bases), the two trays, the closed and the packed box, the box jig */
   function partName(id) { if (GT.partName) { const n = GT.partName(id); if (n) return n; } return (META.part_name || {})[id] || id.replace(/-/g, ' '); }
@@ -146,7 +161,7 @@
   const groupIds = g => Object.keys(ASMS).filter(k => ASMS[k].group === g);
   const PGROUPS = [['Assemblies', groupIds('Assemblies')], ['Views', groupIds('Views')], ['Assembly jigs', groupIds('Assembly jigs')]].concat(GT.groups || []);
   const listed = new Set(); for (const [, ids] of PGROUPS) for (const id of ids) listed.add(id);
-  const BOX_IDS = ['floor-base', 'lid-cut', 'wall-S-base', 'wall-E-base', 'wall-N-base', 'wall-W-base', 'wall-S-lid', 'wall-E-lid', 'wall-N-lid', 'wall-W-lid', 'neck-A', 'neck-B'];
+  const BOX_IDS = ['floor-base', 'lid-cut', 'wall-S-base', 'wall-E-base', 'wall-N-base', 'wall-W-base', 'wall-S-lid', 'wall-E-lid', 'wall-N-lid', 'wall-W-lid', 'neck-A', 'neck-A-half', 'neck-B', 'neck-B-half'].filter(k => PARTS[k]);
   const rest = Object.keys(PARTS).filter(k => !listed.has(k) && !BOX_IDS.includes(k) && !/-back$|^lid-inner$|^lid-outer$|^floor-base-(map|under)$|-lid-up$|^jig-|^[wt]?test-|^kerf-|^fitcomb$/.test(k));
   if (rest.length) PGROUPS.push(['Other pieces', rest]);
   PGROUPS.push(['Box', BOX_IDS], ['Kerf coupons and sample joints', Object.keys(PARTS).filter(k => /^([wt]?test-|kerf-)/.test(k))]);
@@ -189,8 +204,24 @@
   const FOG = [1800, 4600];   /* the table fades into the backdrop beyond this, so no camera angle shows its edge */
   /* the parts panel covers the right of the stage while it is open, so a home view is shifted to keep its subject in the clear part */
   const panelEl = el('panel'), stageEl = el('stage');
+  /* the whole table in the viewport: from the game's home view, the camera backs off (never in) until every piece and both trays project inside a
+     5 % margin, and the view centres on them (owner, 2026-09-18: "after opening, the view is too zoomed-in, the boxes are cut off on the left and
+     right sides"). Projection is near enough linear in 1/view at the focus depth; two rounds settle the perspective. */
+  function fitTable(v) {
+    const insts = T.static.concat(T.dynamic).filter(inst => !inst.hidden && inst.part);
+    if (!insts.length) return v;
+    for (let round = 0; round < 2; round++) {
+      scene.setView(v);
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const inst of insts) { const B = scene.basis(inst), bb = inst.part.bbox; for (const u of [bb[0], bb[2]]) for (const w of [bb[1], bb[3]]) for (const h of [0, inst.thick || 3]) { const p = scene.project(...scene.world(B, u, w, h)); x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); } }
+      const m = 0.05, grow = Math.max(1, (x1 - x0) / (scene.W * (1 - 2 * m)), (y1 - y0) / (scene.H * (1 - 2 * m)));
+      const mm = v.view / scene.H, dx = ((x0 + x1) / 2 - scene.W / 2) * mm, dy = (scene.H / 2 - (y0 + y1) / 2) * mm, R = scene.cam.right, U = scene.cam.up;   /* the subject's centre to the viewport's */
+      v = Object.assign({}, v, { view: v.view * grow, cx: v.cx + R[0] * dx + U[0] * dy, cy: v.cy + R[1] * dx + U[1] * dy, cz: v.cz + R[2] * dx + U[2] * dy });
+    }
+    return v;
+  }
   function framed(v0) {
-    const portrait = scene.H > scene.W, v = Object.assign({}, v0, { view: v0.view * (portrait ? 1.08 * scene.H / scene.W : 1) });   /* a tall phone screen backs off so the whole width of the subject fits */
+    const portrait = scene.H > scene.W, base = v0 === T.home ? fitTable(v0) : v0, v = Object.assign({}, base, { view: base.view * (portrait ? 1.08 * scene.H / scene.W : 1) });   /* a tall phone screen backs off so the whole width of the subject fits */
     scene.setView(v); const mm = v.view / scene.H, out = Object.assign({}, v);
     if (portrait) { const d = scene.H * 0.13 * mm, U = scene.cam.up; out.cx -= U[0] * d; out.cy -= U[1] * d; out.cz -= U[2] * d; }   /* the log covers the bottom of a phone screen: the subject sits higher */
     if (panelEl.hidden) return out;
@@ -225,17 +256,30 @@
     const open = [...document.querySelectorAll('.modal')].find(m => !m.hidden); if (open) closeModal(open.id.slice(6)); else if (mode === 'parts') closeModal('parts');
   });
   window.__modal = { open: openModal, close: closeModal };
+  /* look is the reader's orbit on top of the opening's scripted camera, so a drag on the closed boxes or during the flights is not overwritten next frame */
+  const LOOK = { yaw: 0, pitch: 0, cx: 0, cy: 0, cz: 0, view: 1 };
+  const resetLook = () => { LOOK.yaw = LOOK.pitch = LOOK.cx = LOOK.cy = LOOK.cz = 0; LOOK.view = 1; };
+  const withLook = base => Object.assign({}, base, { yaw: base.yaw + LOOK.yaw, pitch: base.pitch + LOOK.pitch, cx: base.cx + LOOK.cx, cy: base.cy + LOOK.cy, cz: base.cz + LOOK.cz, view: Math.max(20, Math.min(4000, (base.view || 980) * LOOK.view)) });
   (function orbit(cv, sc) {
     let drag = null;
-    cv.addEventListener('pointerdown', e => { if (INTRO.live || modalOpen()) return; e.preventDefault(); drag = { btn: e.button, x: e.clientX, y: e.clientY, yaw: sc.opts.yaw, pitch: sc.opts.pitch, cx: sc.opts.cx, cy: sc.opts.cy, cz: sc.opts.cz }; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointerdown', e => { if (modalOpen()) return; e.preventDefault(); drag = { btn: e.button, x: e.clientX, y: e.clientY, yaw: sc.opts.yaw, pitch: sc.opts.pitch, cx: sc.opts.cx, cy: sc.opts.cy, cz: sc.opts.cz }; cv.setPointerCapture(e.pointerId); });
     cv.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (drag.btn === 2 || e.shiftKey) { const mm = sc.opts.view / sc.H; const R = sc.cam.right, U = sc.cam.up; sc.setView({ cx: drag.cx - R[0] * dx * mm + U[0] * dy * mm, cy: drag.cy - R[1] * dx * mm + U[1] * dy * mm, cz: drag.cz - R[2] * dx * mm + U[2] * dy * mm }); }
+      if (INTRO.live) {
+        const base = introCamera(INTRO.p);
+        if (drag.btn === 2 || e.shiftKey) { const mm = sc.opts.view / sc.H; const R = sc.cam.right, U = sc.cam.up;
+          LOOK.cx = drag.cx - R[0] * dx * mm + U[0] * dy * mm - base.cx; LOOK.cy = drag.cy - R[1] * dx * mm + U[1] * dy * mm - base.cy; LOOK.cz = drag.cz - R[2] * dx * mm + U[2] * dy * mm - base.cz; }
+        else { LOOK.yaw = drag.yaw - dx * 0.5 - base.yaw; LOOK.pitch = drag.pitch - dy * 0.35 - base.pitch; }
+        sc.setView(withLook(base));
+      } else if (drag.btn === 2 || e.shiftKey) { const mm = sc.opts.view / sc.H; const R = sc.cam.right, U = sc.cam.up; sc.setView({ cx: drag.cx - R[0] * dx * mm + U[0] * dy * mm, cy: drag.cy - R[1] * dx * mm + U[1] * dy * mm, cz: drag.cz - R[2] * dx * mm + U[2] * dy * mm }); }
       else sc.setView({ yaw: drag.yaw - dx * 0.5, pitch: drag.pitch - dy * 0.35 });
       dirty = true; });
     cv.addEventListener('pointerup', () => { drag = null; }); cv.addEventListener('pointercancel', () => { drag = null; });
     cv.addEventListener('contextmenu', e => e.preventDefault());
-    /* the wheel (and a trackpad pinch, which arrives as ctrl + wheel) zooms the view once the box is open; nothing during the opening */
-    cv.addEventListener('wheel', e => { e.preventDefault(); if (INTRO.live) return; sc.setView({ view: Math.max(20, Math.min(4000, sc.opts.view * Math.exp(e.deltaY * 0.0012))) }); dirty = true; }, { passive: false });
+    /* the wheel (and a trackpad pinch, which arrives as ctrl + wheel) zooms; during the opening it scales the scripted view */
+    cv.addEventListener('wheel', e => { e.preventDefault(); if (modalOpen()) return;
+      if (INTRO.live) { LOOK.view = Math.max(0.05, Math.min(8, LOOK.view * Math.exp(e.deltaY * 0.0012))); sc.setView(withLook(introCamera(INTRO.p))); }
+      else sc.setView({ view: Math.max(20, Math.min(4000, sc.opts.view * Math.exp(e.deltaY * 0.0012))) });
+      dirty = true; }, { passive: false });
   })(canvas, scene);
   window.addEventListener('resize', () => { scene.resize(); dirty = true; });
 
@@ -248,7 +292,29 @@
       snap = Math.max(snap, Math.hypot(x - inst.x, y - inst.y), Math.abs(z - inst.z), d * 0.1);
     }
     window.__maxSnap = Math.max(window.__maxSnap || 0, snap);
-    return snap;
+    return Math.max(snap, measureSettled());
+  }
+  /* the settled pose: once a turn's animation is over, every piece must already be exactly where the game's own re-pose from the engine state puts
+     it, compared as the renderer sees it (position, turn, flip, standing, groups: the whole basis), so an animation that ends short of its pose and
+     snaps is caught (owner, 2026-09-19: "the loot does not land on the cat correctly and snaps to the correct pose at the end of the animation.
+     this seems like it could be an engine level unit test"); the worst piece is reported in window.__snapWorst */
+  function measureSettled() {
+    const insts = T.static.concat(T.dynamic).filter(i => i.part);
+    const poses = () => { const by = new Map(); for (const i of insts) { if (i.hidden) continue; const pid = i.part.pid; if (!by.has(pid)) by.set(pid, []); by.get(pid).push(scene.basis(i)); } return by; };
+    const before = poses(); setBoardFromState(G); GT.syncShown(G); dirty = true; const after = poses();
+    /* two copies of one part are interchangeable (the re-pose may deal the other disc): each shown piece is matched to the nearest shown copy of its part */
+    const gap = (b, a) => Math.max(...['O', 'U', 'V', 'N'].map(key => Math.hypot(b[key][0] - a[key][0], b[key][1] - a[key][1], b[key][2] - a[key][2]) * (key === 'O' ? 1 : 10)));   /* a unit axis off by 0.1 counts as a millimetre */
+    let worst = 0, who = null;
+    for (const pid of new Set([...before.keys(), ...after.keys()])) {
+      const B = before.get(pid) || [], A0 = after.get(pid) || [], A = A0.slice();
+      let d = B.length === A.length ? 0 : 1e3, pair = null;   /* shown or hidden by the animation but not by the state */
+      for (const b of B) { if (!A.length) break; let k = 0, best = Infinity; A.forEach((a, j) => { const g = gap(b, a); if (g < best) { best = g; k = j; } }); if (best > d) pair = [b, A[k]]; A.splice(k, 1); d = Math.max(d, best); }
+      if (d > worst) { worst = d; who = pid; }
+      if (d > 0.3) (window.__snapLog = window.__snapLog || []).push({ turn: G && G.turn, pid, mm: +d.toFixed(2), shown: [B.length, A0.length], from: pair && pair[0].O.map(v => +v.toFixed(2)), to: pair && pair[1].O.map(v => +v.toFixed(2)) });
+    }
+    window.__maxSnap = Math.max(window.__maxSnap || 0, worst);
+    if (worst > (window.__snapWorst ? window.__snapWorst.mm : 0)) window.__snapWorst = { pid: who, mm: +worst.toFixed(2), turn: G && G.turn };
+    return worst;
   }
   window.__placements = {
     table: () => { introFinish(); return T.static.concat(T.dynamic); },
@@ -497,7 +563,9 @@
   }
   function ensureWorker() {
     if (regen.worker) return regen.worker;
-    const src = GEOM_SOURCES.join('\n;\n') + '\n;(' + workerMain.toString() + ')();\n';
+    /* the fonts are registered as soon as the engine's shapes module exists, before the game's own files run: a game may draw lettering while it loads
+       (TUMBLER builds its parts as its geometry module is evaluated), and the fonts message would come too late */
+    const src = `const __FONTS = ${JSON.stringify(FONTS)};\n` + GEOM_SOURCES.map(code => code + '\n;if (self.BGEngine && self.BGEngine.shapes && self.BGEngine.shapes.register_fonts && !self.__fontsDone) { self.BGEngine.shapes.register_fonts(__FONTS); self.__fontsDone = true; }\n').join('\n;\n') + '\n;(' + workerMain.toString() + ')();\n';
     const w = regen.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     w.postMessage({ type: 'fonts', fonts: FONTS, cache: ENG_CACHE, parts: PARTS });
     w.onmessage = onWorker;
@@ -600,14 +668,14 @@
      fitcheck nothing here runs. */
   const boxBtn = el('btn-box'), hudEl = el('hud'), titleEl = el('intro-title'), spotEl = el('spot');
   const OPEN_MS = 10000, CLOSE_MS = 7000;   /* the owner, watching the first cut: "the opening animation is too slow. maybe double the speed" */
-  const INTRO = { pending: true, live: false, open: false, dir: 0, rate: 1, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], yE: 0, tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [], shot: false };
+  const INTRO = { pending: true, live: false, open: false, dir: 0, rate: 1, resumeFrom: -1, p: -1, forced: null, last: 0, all: [], base: [], lid: [], lidRot: null, pieces: [], boxB: [], tipP: [0, 0], tipAxis: [1, 0, 0], tipB: null, cam: [], end: 0, planner: null, fromTable: false, pileOrder: [], shot: false };
   const V3 = { dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
     unit: a => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; }, sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]] };
   const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
   const seg = (p, a, b) => clamp01((p - a) / (b - a));
   const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const mixHex = (a, b, u) => '#' + hexRGB(a).map((v, i) => Math.round(v + (hexRGB(b)[i] - v) * u).toString(16).padStart(2, '0')).join('');
-  const DARK = '#120c07', TABLE = '#3b2a1c';
+  const TABLE = '#3b2a1c';
   /* the rotation carrying frame E onto frame S, as the renderer's group rotation wants it: a unit axis and an angle in degrees. The renderer's
      group turns the other way round its axis than the textbook formula (it takes v x axis), so the axis is negated here. */
   function relRot(E, S) {
@@ -623,7 +691,7 @@
   function tweenRecord(inst, S) {
     const E = scene.basis(inst), bb = inst.part.bbox, c = [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2, inst.thick / 2];
     const PE = scene.world(E, c[0], c[1], c[2]), PS = scene.world(S, c[0], c[1], c[2]), R = relRot(E, S);
-    return { inst, E, S, end: { x: inst.x, y: inst.y, z: inst.z }, off: V3.sub(PE, [inst.x, inst.y, inst.z]), PE, PS, axis: R.axis, angle: R.angle, shadow0: inst.shadow, thick: inst.thick, mates: [] };
+    return { inst, E, S, end: { x: inst.x, y: inst.y, z: inst.z }, off: V3.sub(PE, [inst.x, inst.y, inst.z]), PE, PS, axis: R.axis, angle: R.angle, shadow0: inst.shadow, group0: inst.group, thick: inst.thick, mates: [] };   /* group0: the game's own groups on the piece at its table pose (a tilt, a flip), back once it lands */
   }
   /* pose the instance so its centre sits at P with the rotation angle a (degrees) still to go about the pivot (its centre unless given), then the whole-box tip on top */
   function poseAt(q, P, a, tipG, pivot, axis) {
@@ -631,14 +699,15 @@
     const own = a ? { angle: a, pivot: pivot || P, axis: axis || q.axis } : null;
     inst.group = own ? (tipG ? [own, tipG] : own) : (tipG ? [tipG] : undefined);
   }
-  function restore(q) { const inst = q.inst; inst.x = q.end.x; inst.y = q.end.y; inst.z = q.end.z; inst.group = undefined; inst.shadow = q.shadow0; }
+  function restore(q) { const inst = q.inst; inst.x = q.end.x; inst.y = q.end.y; inst.z = q.end.z; inst.group = q.group0; inst.shadow = q.shadow0; }
   /* the timeline, in progress p: one thing at a time, each settled before the next starts; the pieces from W0, scheduled below. Most of the
      time goes to the pieces (owner, 2026-09-18: "the box opening animation spends too much time on the rear-facing box fade-out and zoom, and
      too little time spreading the pieces out") */
   const TL = { title: [0, 0.05], fadeB: [0.03, 0.11], lights: [0.09, 0.18], tip: [0.19, 0.29], lid: [0.30, 0.39], hud: [0.95, 1] };
   const FLY = 0.03, LIFT = 0.28, DROP = 0.1, W0 = 0.40, LID_ALT = 150;   /* a flight: a lift of LIFT x FLY, the carry, a drop of DROP x FLY; the carry stretches when the piece must land after another */
   /* the outline and stock that make two packed pieces interchangeable in a pile: any hex tile fits any hex slot */
-  const outlineSig = inst => { const o = inst.part.cuts.find(k => !k.hole); if (!o) throw new Error(`${inst.part.pid} has no outline`); return inst.stock + ':' + o.pts.map(p => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10)).join(';'); };
+  /* a packed slot takes any piece with the same outline and stock; a game's table may tell alike pieces apart with sig(pid) (TUMBLER's inner and outer wheel faces share outlines but not wheels) */
+  const outlineSig = inst => { const o = inst.part.cuts.find(k => !k.hole); if (!o) throw new Error(`${inst.part.pid} has no outline`); return inst.stock + ':' + (GT.sig ? GT.sig(inst.part.pid) + ':' : '') + o.pts.map(p => Math.round(p[0] * 10) + ',' + Math.round(p[1] * 10)).join(';'); };
   /* where a piece is at scroll progress p: null in the box, 'landed', or its centre and the turn still to go. One arc: it lifts out of the box
      over the first part of the flight, crosses at its arc height, and drops onto its place over the last part; a standing piece turns upright
      as it drops. Nothing waits in the air. */
@@ -763,12 +832,19 @@
   function introBuild() {
     const D = DIM(), floorTop = D.FU + D.T3, IB = INTRO;
     IB.all = T.static.concat(T.dynamic).map(inst => ({ inst, end: { x: inst.x, y: inst.y, z: inst.z, rot: inst.rot, flipped: inst.flipped, hidden: inst.hidden }, shadow0: inst.shadow }));
-    IB.yE = BOXO[1] + IY + D.EL + D.WT;   /* the closed box's near face: the lid's, the roomier tray */
+    /* the closed boxes stand on the wall GT.stand names ('S' unless the table says: the wall toward the viewer at the start), so the cover reads the
+       right way up: n is the unit vector toward the viewer, s the viewer's right, yaw0 the camera's azimuth; the standing box is HN tall (its extent
+       along n plus the trays' walls) and NF is its near face's offset from the box's centre */
+    const STAND = { S: { n: [0, 1], s: [1, 0], yaw: 0 }, E: { n: [1, 0], s: [0, -1], yaw: 90 }, N: { n: [0, -1], s: [-1, 0], yaw: 180 }, W: { n: [-1, 0], s: [0, 1], yaw: -90 } }[GT.stand || 'S'];
+    if (!STAND) throw new Error(`GT.stand must be S, E, N or W, not ${GT.stand}`);
+    const cA = [BOXO[0] + IX / 2, BOXO[1] + IY / 2], along = v => Math.abs(v[0]) * IX + Math.abs(v[1]) * IY, NF = along(STAND.n) / 2 + D.EL + D.WT, HN = along(STAND.n) + 2 * (D.EL + D.WT), WS = along(STAND.s) + 2 * (D.EL + D.WT);
+    const at = (u, w) => [cA[0] + STAND.s[0] * u + STAND.n[0] * w, cA[1] + STAND.s[1] * u + STAND.n[1] * w];   /* a table point u to the viewer's right and w toward the viewer of the box's centre */
+    IB.tipP = at(0, NF); IB.tipAxis = [STAND.s[0], STAND.s[1], 0];   /* the closed box's near edge on the table, the line it tips about */
     IB.base = BOXA.slice();
     /* the lid: its packed pose is the open tray carried onto the base and turned over about the box's mid-height. It flies as one rigid body:
        every part keeps its offset from the tray's centre, and one rotation (the floor's) turns them all about that moving centre */
     IB.lid = LIDA.map(inst => {
-      const tmp = Object.assign({}, inst, { x: inst.x - LIDO[0] + BOXO[0], y: inst.y - LIDO[1] + BOXO[1], group: { angle: 180, pivot: [BOXO[0] + IX / 2, BOXO[1] + IY / 2, D.LID_TOP / 2], axis: [0, 1, 0] } });
+      const tmp = Object.assign({}, inst, { x: inst.x - LIDO[0] + BOXO[0], y: inst.y - LIDO[1] + BOXO[1], group: { angle: 180, pivot: [BOXO[0] + IX / 2, BOXO[1] + IY / 2, D.LID_TOP / 2], axis: HINGE === 'x' ? [1, 0, 0] : [0, 1, 0] } });
       return tweenRecord(inst, scene.basis(tmp));
     });
     const mean = k => IB.lid.reduce((a, q) => V3.add(a, q[k]), [0, 0, 0]).map(v => v / IB.lid.length);
@@ -856,7 +932,12 @@
     const pieces = [];
     for (const [sig, group] of bySig) {
       const list = insts.filter(i => i._sig === sig).sort((a, b) => a._b[2] - b._b[2] || a.x - b.x || a.y - b.y), order = group.slice().sort((a, b) => a.seq - b.seq);
-      list.forEach((inst, k) => { const sl = order[k]; const S = scene.basis({ part: inst.part, x: sl.x, y: sl.y, z: sl.z, rot: sl.rot, flipped: !!inst.flipped, thick: inst.thick });
+      /* a piece packed where it plays keeps that slot (it stays put in the opening); the rest pair by table height and turn to leave */
+      const same = (inst, sl) => { const d = ((((inst.rot || 0) - (sl.rot || 0)) % 360) + 360) % 360; return Math.hypot(inst.x - sl.x, inst.y - sl.y, inst.z - sl.z) < 0.6 && (d < 0.5 || d > 359.5); };
+      const pairs = [], restI = list.slice(), restS = order.slice();
+      for (const sl of order) { const i = restI.findIndex(inst => same(inst, sl)); if (i < 0) continue; pairs.push([restI[i], sl]); restI.splice(i, 1); restS.splice(restS.indexOf(sl), 1); }
+      restI.forEach((inst, k) => pairs.push([inst, restS[k]]));
+      pairs.forEach(([inst, sl]) => { const S = scene.basis({ part: inst.part, x: sl.x, y: sl.y, z: sl.z, rot: sl.rot, flipped: !!inst.flipped, thick: inst.thick });
         const q = tweenRecord(inst, S); q.slot = sl; q.seq = sl.seq; q.band = sl.band; q.vertical = !!inst.vertical; q.thick = inst._fat;
         /* a glued mate: its packed pose is the carrier's plus the offset it keeps on the table, so the pair is rigid in the box as on the table */
         q.mates = (inst._mates || []).map(m => { const Sm = scene.basis({ part: m.part, x: sl.x, y: sl.y, z: sl.z + (m.z - inst.z), rot: sl.rot, flipped: !!m.flipped, thick: m.thick }); const mq = tweenRecord(m, Sm); mq.d = V3.sub(mq.PE, q.PE); return mq; });
@@ -865,27 +946,34 @@
     for (const inst of insts) { delete inst._sig; delete inst._E; delete inst._b; delete inst._pts; delete inst._fat; delete inst._mates; }
     /* the plan is made between frames (two or three seconds of work: the boxes are on screen meanwhile); until it is done every piece
        stays where the opening starts from, in the box or, coming back up from the game, on the table */
-    IB.pieces = pieces; IB.end = null; IB.fromTable = INTRO.resumeFrom >= 0; IB.planner = schedule(pieces);
-    for (const q of pieces) { q.t0 = q.tL = IB.fromTable ? -1 : 2; q.H = 0; q.delay = 0; q.lift = 0; }
+    /* a piece the box holds where the game plays it stays put: landed from the start, never planned (TUMBLER's board is its box: the pocket
+       layer, the wheels, the loot and the tiles play where they are packed; owner, 2026-09-19: "all of the dials can start out in-place in
+       the animation. they don't need to fly out of the box since the whole game is played inside the box") */
+    const stays = q => Math.hypot(q.PE[0] - q.PS[0], q.PE[1] - q.PS[1], q.PE[2] - q.PS[2]) < 0.6 && Math.abs(q.angle) < 0.5;
+    const movers = [];
+    for (const q of pieces) { if (!stays(q)) { movers.push(q); continue; } q.PS = q.PE.slice(); q.S = q.E; q.angle = 0; for (const m of q.mates) { m.PS = m.PE.slice(); m.S = m.E; } }   /* its packed pose is its table pose, to the last digit */
+    IB.pieces = pieces; IB.end = null; IB.fromTable = INTRO.resumeFrom >= 0; IB.planner = schedule(movers);
+    for (const q of pieces) { q.t0 = q.tL = IB.fromTable || stays(q) ? -1 : 2; q.H = 0; q.delay = 0; q.lift = 0; }
     /* the second box: built one box height further from the viewer and tipped the other way about its far edge, it stands beside the first,
        at the same depth, its underside toward the viewer; turned half a turn about its centre first, so the underside art reads the right way up */
-    const DX = IX + 2 * (D.EL + D.WT) + 46, oyB = BOXO[1] + IY + 2 * (D.EL + D.WT) + D.LID_TOP, L = [];
-    tray(L, BOXO[0] + DX, oyB, 'base'); neck(L, BOXO[0] + DX, oyB, 'NECK_TOP');
-    L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: BOXO[0] + DX + IX, y: oyB + IY }), d => ({ z: d.LID_FLOOR }))); walls(L, BOXO[0] + DX, oyB, 'lid-up', 'LID_TOP');
-    IB.tipB = { angle: -90, pivot: [0, oyB - D.EL - D.WT, 0], axis: [1, 0, 0] };   /* tipped about the lid wall's outer face, which the standing box rests on */ const turnB = { angle: 180, pivot: [BOXO[0] + DX + IX / 2, oyB + IY / 2, 0], axis: [0, 0, 1] };
+    const DX = WS + 46, cB = at(DX, 2 * NF + D.LID_TOP), oxB = cB[0] - IX / 2, oyB = cB[1] - IY / 2, L = [];
+    tray(L, oxB, oyB, 'base'); neck(L, oxB, oyB, 'NECK_TOP');
+    L.push(posed(mk(Object.assign({ part: part('lid-cut'), back: part('lid-outer') }, lidClosed(oxB, oyB))), d => ({ z: d.LID_FLOOR }))); walls(L, oxB, oyB, 'lid-up', 'LID_TOP');
+    const farB = at(DX, NF + D.LID_TOP);
+    IB.tipB = { angle: -90, pivot: [farB[0], farB[1], 0], axis: IB.tipAxis };   /* tipped about the lid wall's outer face, which the standing box rests on */ const turnB = { angle: 180, pivot: [cB[0], cB[1], 0], axis: [0, 0, 1] };
     L.forEach(inst => { inst.group = [turnB, IB.tipB]; }); IB.boxB = L;
     /* the camera path: keyframes in scroll progress joined by a monotone cubic, so it never stops dead or overshoots: a slow push-in on the
        pair while the title fades and the second box goes, then one crane down and round while the lights come up and the box lies down,
        then a pull back to the table's home view as the lid flies and the pieces come out. Yaw, pitch and view each move one way. */
-    const H = IY + 2 * (D.EL + D.WT), cxA = BOXO[0] + IX / 2, cyA = BOXO[1] + IY / 2, cxB = cxA + DX, home = framed(T.home);
-    IB.spotAt = [(cxA + cxB) / 2, IB.yE + 10];
+    const H = HN, home = framed(T.home), key = (u, w, o) => { const [cx, cy] = at(u, w); return Object.assign({ cx, cy }, o, { yaw: o.yaw + STAND.yaw }); };
+    IB.spotAt = at(DX / 2, NF + 10);
     const VS = Math.max(1, (IX + IY) / 380);   /* the keyframes were framed on a 190 mm box: a bigger box is seen from proportionally further */
     IB.cam = [
-      [0.00, { pitch: 84, yaw: -24, dist: 2500 * VS, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 36, view: 560 * VS }],
-      [0.11, { pitch: 82, yaw: -21, dist: 2350 * VS, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 26, view: 520 * VS }],
-      [0.19, { pitch: 70, yaw: -17, dist: 1900 * VS, cx: cxA, cy: IB.yE - 30, cz: 30, view: 430 * VS }],
-      [0.29, { pitch: 58, yaw: -12, dist: 1500 * VS, cx: cxA, cy: cyA, cz: 18, view: 400 * VS }],
-      [0.42, { pitch: 52, yaw: -6, dist: 2000, cx: home.cx, cy: home.cy, cz: home.cz, view: home.view * 0.9, framed: true }],
+      [0.00, key(DX / 2, NF, { pitch: 84, yaw: -24, dist: 2500 * VS, cz: H / 2 + 36, view: 560 * VS })],
+      [0.11, key(DX / 2, NF, { pitch: 82, yaw: -21, dist: 2350 * VS, cz: H / 2 + 26, view: 520 * VS })],
+      [0.19, key(0, NF - 30, { pitch: 70, yaw: -17, dist: 1900 * VS, cz: 30, view: 430 * VS })],
+      [0.29, key(0, 0, { pitch: 58, yaw: -12, dist: 1500 * VS, cz: 18, view: 400 * VS })],
+      [0.42, { pitch: 52, yaw: -6 + STAND.yaw, dist: 2000, cx: home.cx, cy: home.cy, cz: home.cz, view: home.view * 0.9, framed: true }],
       [0.94, Object.assign({}, home, { framed: true })]];   /* framed: the view is the table's own (framed() already sized it for this viewport), so the game's first frame is the opening's last and the camera never steps */
   }
   const CAMK = ['pitch', 'yaw', 'dist', 'cx', 'cy', 'cz', 'view'];
@@ -908,7 +996,7 @@
     const IB = INTRO;
     const title = 1 - ez(seg(p, TL.title[0], TL.title[1])), fadeB = 1 - ez(seg(p, TL.fadeB[0], TL.fadeB[1])), lights = ez(seg(p, TL.lights[0], TL.lights[1]));
     const tip = 90 * (1 - ez(seg(p, TL.tip[0], TL.tip[1]))), lidU = seg(p, TL.lid[0], TL.lid[1]);
-    const tipG = Math.abs(tip) > 1e-4 ? { angle: tip, pivot: [0, IB.yE, 0], axis: [1, 0, 0] } : null;
+    const tipG = Math.abs(tip) > 1e-4 ? { angle: tip, pivot: [IB.tipP[0], IB.tipP[1], 0], axis: IB.tipAxis } : null;
     scene.opts.tableAlpha = lights; scene.opts.table = mixHex(DARK, TABLE, lights);
     for (const inst of IB.base) inst.group = tipG ? [tipG] : undefined;
     if (lidU >= 1) { for (const q of IB.lid) restore(q); }
@@ -920,14 +1008,14 @@
       for (const q of IB.lid) poseAt(q, V3.add(C, q.d), a, tipG, C, IB.lidRot.axis);
     }
     for (const q of IB.pieces) {
-      const f = IB.planner ? (IB.fromTable ? 'landed' : null) : flight(q, p);
+      const f = IB.planner ? (IB.fromTable || q.tL < 0 ? 'landed' : null) : flight(q, p);   /* while the plan is made: pieces that stay put are landed already */
       if (f === 'landed') { restore(q); if (tipG) q.inst.group = [tipG]; for (const m of q.mates) { restore(m); if (tipG) m.inst.group = [tipG]; } continue; }
       if (f === null) { poseAt(q, q.PS, q.angle, tipG); q.inst.shadow = false; for (const m of q.mates) { poseAt(m, V3.add(q.PS, m.d), q.angle, tipG, q.PS, q.axis); m.inst.shadow = false; } continue; }
       q.inst.shadow = q.shadow0; poseAt(q, f.P, f.a, tipG);
       for (const m of q.mates) { m.inst.shadow = m.shadow0; poseAt(m, V3.add(f.P, m.d), f.a, tipG, f.P, q.axis); }   /* glued on: the same path and turn, at its offset */
     }
     for (const inst of IB.boxB) { inst.alpha = fadeB < 1 ? fadeB : undefined; inst.hidden = fadeB <= 0.01; }
-    scene.setView(introCamera(p));
+    scene.setView(withLook(introCamera(p)));
     const r = seg(p, TL.hud[0], TL.hud[1]); hudEl.style.opacity = r; stageEl.classList.toggle('veiled', r <= 0);
     titleEl.style.opacity = title; titleEl.classList.toggle('gone', title <= 0);
     boxButton();
@@ -985,7 +1073,8 @@
   }
   /** the table as the table view keeps it: every instance back in its table pose, the second box gone, the opening over until the geometry changes */
   function introFinish() {
-    if (INTRO.live) { for (const q of INTRO.all) restore(q); for (const q of INTRO.pieces) { q.inst.alpha = undefined; q.inst.shadow = q.shadow0; } INTRO.boxB = []; scene.dynamic = T.dynamic; scene.setView(framed(T.home)); }
+    if (INTRO.live) { for (const q of INTRO.all) restore(q); for (const q of INTRO.pieces) { q.inst.alpha = undefined; q.inst.shadow = q.shadow0; } INTRO.boxB = []; scene.dynamic = T.dynamic;
+      scene.setView({ pitch: scene.opts.pitch, yaw: scene.opts.yaw, dist: scene.opts.dist, cx: scene.opts.cx, cy: scene.opts.cy, cz: scene.opts.cz, view: scene.opts.view }); resetLook(); }
     INTRO.live = false; INTRO.open = true; INTRO.dir = 0; INTRO.forced = null; INTRO.planner = null; INTRO.end = INTRO.end === null ? 1 : INTRO.end; waiting(false); scene.opts.tableAlpha = 1; scene.opts.table = TABLE;
     stageEl.classList.remove('live', 'veiled'); hudEl.style.opacity = ''; spotEl.hidden = true; titleEl.classList.add('gone'); boxButton(); dirty = true;
   }
@@ -996,7 +1085,7 @@
     for (const inst of T.static.concat(T.dynamic)) inst.group = undefined;
     INTRO.resumeFrom = 1; INTRO.pending = true;
   }
-  window.__intro = { get p() { return INTRO.p; }, get dir() { return INTRO.dir; }, get open() { return INTRO.open; }, get rate() { return INTRO.rate; }, set rate(r) { INTRO.rate = +r; }, openBox, closeBox, get live() { return INTRO.live; }, get end() { return INTRO.end; }, get ready() { return !INTRO.planner && !INTRO.pending; }, get pileOrder() { return INTRO.pileOrder; }, get box() { return { o: BOXO, yE: INTRO.yE, cam: INTRO.cam }; }, get pieces() { return INTRO.pieces.map(q => ({ pid: q.inst.part.pid, id: q.inst.id, t0: q.t0, tL: q.tL, H: q.H, lift: q.lift, delay: q.delay, pile: q.slot.pile, z: q.slot.z, above: q.dbgAbove, under: q.dbgUnder, bS: q.bS.map(v => +v.toFixed(1)), nPts: q.ptsS.length })); }, set: p => { INTRO.forced = clamp01(+p); dirty = true; }, finish: introFinish };
+  window.__intro = { get p() { return INTRO.p; }, get dir() { return INTRO.dir; }, get open() { return INTRO.open; }, get rate() { return INTRO.rate; }, set rate(r) { INTRO.rate = +r; }, openBox, closeBox, get live() { return INTRO.live; }, get end() { return INTRO.end; }, get ready() { return !INTRO.planner && !INTRO.pending; }, get pileOrder() { return INTRO.pileOrder; }, get box() { return { o: BOXO, tipP: INTRO.tipP, cam: INTRO.cam }; }, get pieces() { return INTRO.pieces.map(q => ({ pid: q.inst.part.pid, id: q.inst.id, t0: q.t0, tL: q.tL, H: q.H, lift: q.lift, delay: q.delay, pile: q.slot.pile, z: q.slot.z, above: q.dbgAbove, under: q.dbgUnder, bS: q.bS ? q.bS.map(v => +v.toFixed(1)) : null, nPts: q.ptsS ? q.ptsS.length : 0, stays: q.tL < 0 })); }, set: p => { INTRO.forced = clamp01(+p); dirty = true; }, finish: introFinish };
 
   /* ------------------------------------------------------------ go */
   G = new S.Game({ players: NP, seed: currentSeed }); qr = S.mulberry(1); initTable(G); chips(-1); GT.resetShown(G); window.__maxSnap = 0;
