@@ -28,6 +28,7 @@
       if (!KINDS.includes(p.kind)) throw new Error(`part ${p.id}: kind ${p.kind} is not one of ${KINDS.join(', ')}`);
       if (!Number.isInteger(p.count) || p.count < 1) throw new Error(`part ${p.id}: count must be a whole number of copies`);
       if (!spec.stocks[p.stock]) throw new Error(`part ${p.id}: stock ${p.stock} is not in the spec's stocks (${Object.keys(spec.stocks).join(', ')})`);
+      if (p.raster !== undefined && p.raster !== true && !(p.raster && p.raster.geom_type)) throw new Error(`part ${p.id}: raster must be true (its engraving is never drawn as concentric lines) or a lasergeom geometry (the region of its art that is never)`);
       if (p.kind === 'standee') {
         if (!p.silhouette || !p.silhouette.geom_type) throw new Error(`standee ${p.id}: silhouette must be a lasergeom polygon`);
         if (!p.in || !spec.stocks[p.in]) throw new Error(`standee ${p.id}: in = the stock key of the base or tile it stands in`);
@@ -129,10 +130,12 @@
         const kerf_of = pid => { const s = stock_of[pid]; if (!s) throw new Error(`${pid}: no stock recorded`); return F.stocks[s].kerf; };
         const setStock = (pid, s) => { stock_of[pid] = s; };
         const add = (pid, shape, art, o) => lay.add(pid, shape === undefined ? null : shape, art === undefined ? EMPTY : art, Object.assign({ kerf: kerf_of(pid) }, o || {}));
+        const raster_of = {};   // part id -> the spec's `raster` flag: true keeps the part's engraving a raster on every sheet, a geometry keeps what touches it
         const keyed = (pid, shape, key, draw, o) => {
           if (GAME.on_part) GAME.on_part(pid, pid.replace(/-back$/, ''));
           if (GAME.part_filter && !GAME.part_filter(pid, pid.replace(/-back$/, ''))) return false;
-          lay.add(pid, shape === undefined ? null : shape, draw, Object.assign({ art_key: key, kerf: kerf_of(pid) }, o || {}));
+          const r = raster_of[pid.replace(/-back$/, '')], vf = r === true ? { vector_fill: false } : r ? { vector_fill: { raster: r } } : {};
+          lay.add(pid, shape === undefined ? null : shape, draw, Object.assign({ art_key: key, kerf: kerf_of(pid) }, vf, o || {}));
           return true;
         };
         const mirrored = shape => K.back_art(shape, shape);
@@ -188,6 +191,7 @@
             keyed(pid + '-back', null, `part:${p.id}:back`, () => K.back_art(snom, p.art ? p.art() : EMPTY), { edge: mirrored(snom), back: true, eng_post: g => K.clip_out(g, band_back, 0.6, 1.2), eng_post_key: bk });
           }
         };
+        for (const p of spec.parts) if (p.raster !== undefined) raster_of[p.id] = p.raster;
         for (const p of spec.parts) { if (p.kind === 'standee') standee(p); else if (p.kind === 'base') base(p); else if (p.kind === 'pair') pair(p); else if (p.kind === 'tray') tray(p); else flat(p); }
         // ------------------------------------------------------------ the box
         step('box', 0.4);

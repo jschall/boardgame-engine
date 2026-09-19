@@ -11,6 +11,8 @@
      node engine/bin/bg.js page [--no-manual] [--no-geom] <slug>.html, the whole page
      node engine/bin/bg.js manual                        the print rulebook: sync, assets, the PDFs, the checks (needs the page built once with --no-manual)
      node engine/bin/bg.js lint                          svg_lint on parts.json against manifest.json
+     node engine/bin/bg.js lasertime [--all]             the estimated engraving time of every sheet and what the vector fill converted (compare with the machine's estimate)
+     node engine/bin/bg.js concentric <in.svg> <out.svg> [--pitch 0.254] [--burn 0.36] [--kerf 0.18] [--scale 1]   a shape as a concentric scoring path
      node engine/bin/bg.js fit ['#hash' ...]             fitcheck at the built stock (and at each hash given: both ends of the range)
      node engine/bin/bg.js check                         the page gates: page_check, the repo gate, qa_intersections, verify_anim
      node engine/bin/bg.js all                           parts, stats, pack, jig, page --no-manual, manual, page, lint, fit, check
@@ -50,6 +52,8 @@ const commands = {
     for (const f of ['verify.js', 'check-references.js']) if (fs.existsSync(path.join(M, f))) node(path.join(M, f), [], { cwd: M });
   },
   lint() { cfg(); node(path.join(ENGINE, 'checks', 'svg_lint.js'), ['parts/parts.json', '--counts', 'manifest.json'].concat(argv)); },
+  lasertime() { cfg(); node(path.join(ENGINE, 'checks', 'laser_time.js'), argv); },
+  concentric() { node(path.join(ENGINE, 'tools', 'concentric.js'), argv); },
   fit() {
     cfg(); const hashes = argv.filter(a => a.startsWith('#'));
     node(path.join(ENGINE, 'checks', 'fitcheck.js'), ['parts/parts.json', path.join(ENGINE, 'checks', 'scenes.js')]);
