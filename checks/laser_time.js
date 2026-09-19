@@ -24,8 +24,8 @@ for (const [name, r] of Object.entries(vf.sheets)) {
   const rows = (r.decisions || []).filter(d => all || d.converted);
   if (rows.length) {
     const W = [10, 44, 7, 9, 12, 13, 11, 13, 8, 6];
-    console.log('  ' + ['decision', 'shape (part:element ×copies)', 'copies', 'area mm²', 'size mm', 'raster alone', 'edge score', 'sheet saving', 'vector', 'lines'].map((h, i) => h.padEnd(W[i])).join(''));
-    for (const d of rows) console.log('  ' + [d.converted ? 'vector' : 'raster', d.parts.map(p => `${p.pid}:${p.element}${p.copies > 1 ? ' ×' + p.copies : ''}`).join(', '), String(d.copies), String(d.area_mm2), d.size_mm.join(' × '), `${d.raster_alone_s} s`, `${d.edge_score_s} s`, `${d.saving_s} s`, `${d.vector_s} s`, String(d.lines)].map((c, i) => c.padEnd(W[i])).join(''));
+    console.log('  ' + ['decision', 'shape (part:element ×copies)', 'copies', 'area mm²', 'size mm', 'raster alone', 'edge score', 'sheet saving', 'vector', 'lines'].map((h, i) => h.padEnd(W[i])).join(' '));
+    for (const d of rows) console.log('  ' + [d.converted ? 'vector' : 'raster', d.parts.map(p => `${p.pid}:${p.element}${p.copies > 1 ? ' ×' + p.copies : ''}`).join(', '), String(d.copies), String(d.area_mm2), d.size_mm.join(' × '), `${d.raster_alone_s} s`, `${d.edge_score_s} s`, `${d.saving_s} s`, `${d.vector_s} s`, String(d.lines)].map((c, i) => c.padEnd(W[i])).join(' '));
   } else if (!all) console.log('  nothing converted' + ((r.decisions || []).length ? ` (${r.decisions.length} candidate${r.decisions.length === 1 ? '' : 's'} rejected: --all lists them)` : ''));
 }
 console.log(`\nall sheets: raster ${mmss(tb)} as drawn; ${mmss(ta + tv)} with the vector fill (raster ${mmss(ta)} + vector ${mmss(tv)}); ${vf.elements} elements drawn as ${vf.vector_mm} mm of concentric lines. Compare with the machine software's estimate; the cuts and the scores are not in these numbers.`);
