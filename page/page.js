@@ -30,7 +30,7 @@
   let nid = 1; const mk = o => { const r = Object.assign({ id: nid++, shadow: true }, o); r.stock = stockOf(r.part.pid); r.mat = STOCK_MAT(r.stock); r.thick = STOCK_T(r.stock); return r; };
   /* the box's heights and offsets from the built stock: tray floor, rim, neck top, the closed lid's floor and rim */
   const DIM = () => { const T3 = STOCK_T(need(META, 'box_stock', 'META')), TW = STOCK_T(need(META, 'neck_stock', 'META')), F = need(META, 'fits', 'META'), WH = need(META, 'WALL_H', 'META'), FU = need(META, 'FLOOR_UP', 'META'), GAP = need(META, 'GAP', 'META'), NH = need(META, 'NECK_H', 'META');
-    return { T3, TW, WT: need(F, 'WALL_T', 'META.fits'), WH, FU, NCL: (need(META, 'INNER', 'META') - need(META, 'NECK_OUT', 'META')) / 2, EB: need(META, 'BASE_EASE', 'META'), EL: need(META, 'LID_EASE', 'META'), NECK_TOP: FU + T3 + NH, LID_FLOOR: 2 * WH + GAP - FU - T3, LID_TOP: 2 * WH + GAP }; };
+    return { T3, TW, WT: need(F, 'WALL_T', 'META.fits'), WH, FU, NCL: (need(META, 'INNER', 'META') - need(META, 'NECK_OUT', 'META')) / 2, EB: need(META, 'BASE_EASE', 'META'), EL: need(META, 'LID_EASE', 'META'), NECK_ON: META.NECK_ON || 0, NECK_TOP: FU + T3 + (META.NECK_ON || 0) + NH, LID_FLOOR: 2 * WH + GAP - FU - T3, LID_TOP: 2 * WH + GAP }; };
   const posed = (inst, fn) => { inst.repose = () => Object.assign(inst, fn(DIM())); inst.repose(); return inst; };
   let dirty = true;
   /* a cross-lapped pair standing in the tile tilePid: tileZ is the tile's underside; the halves stand on its top face, whatever its stock */

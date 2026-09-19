@@ -55,7 +55,8 @@ const NECK_OFFSET = (K.INNER - META.NECK_OUT) / 2;                      // the s
 const NECK_IN0 = NECK_OFFSET + NECK_T;                                 // inner face of the W / S neck board
 const NECK_IN1 = K.INNER_X - NECK_OFFSET - NECK_T;                     // inner face of the E neck board
 const NECK_IN1Y = K.INNER_Y - NECK_OFFSET - NECK_T;                    // inner face of the N neck board
-const NECK_TOP = FLOOR_TOP + K.NECK_H;
+const NECK_ON = META.NECK_ON || 0;                                   // the neck stands this far above the floor top (on a board layer that fills the tray)
+const NECK_TOP = FLOOR_TOP + NECK_ON + K.NECK_H;
 const LID_RIM = K.WALL_H + K.GAP;                                    // the lid is the same tray upside down, its rim GAP above the base rim
 const LID_FLOOR_UNDER = LID_RIM + (K.WALL_H - K.FLOOR_UP - K.T);     // its floor's inside face (= LID_RIM + SLOT_Y0 when the slot is exactly T)
 if (Math.abs(LID_FLOOR_UNDER - NECK_TOP) > 1e-9) throw new Error(`neck top ${NECK_TOP} and lid floor ${LID_FLOOR_UNDER} disagree`);
@@ -63,6 +64,7 @@ if (META.fits && META.fits.SLOT_Y0 !== undefined && META.fits.SLOT_Y0 > K.WALL_H
 const USABLE_H = LID_FLOOR_UNDER - FLOOR_TOP;
 const BUDGET_H = USABLE_H - SLACK;
 const INTERIOR = sbox(NECK_IN0, NECK_IN0, NECK_IN1, NECK_IN1Y);
+const INTERIOR_LOW = sbox(0, 0, K.INNER_X, K.INNER_Y);                  // under the neck (z + t <= NECK_ON) the whole tray inside is free
 const NECK_RING = sbox(NECK_OFFSET, NECK_OFFSET, K.INNER_X - NECK_OFFSET, K.INNER_Y - NECK_OFFSET).difference(INTERIOR);
 
 /* a piece's stacking thickness: its stock's thickest reading plus the ply tolerance */
@@ -278,7 +280,9 @@ for (const pc of pieces) placed_counts[pc.pid] = (placed_counts[pc.pid] || 0) + 
 for (const [p, n] of Object.entries(inventory)) if ((placed_counts[p] || 0) !== n) problems.push(`${p}: ${placed_counts[p] || 0} packed of ${n}`);
 const INT_EXT = INTERIOR.exterior;
 for (const pc of pieces) {
-  if (!INTERIOR.contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the neck ring`);
+  const low = NECK_ON > 0 && pc.z + pc.t <= NECK_ON + 1e-6;   /* a layer the neck stands on: it may fill the tray */
+  if (low) { if (!INTERIOR_LOW.buffer(0.01).contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the tray wall`); }
+  else if (!INTERIOR.contains(pc.geom)) problems.push(`${pc.pid} (${pc.pile}) crosses the neck ring`);
   else { const d = pc.geom.distance(INT_EXT); if (d < GAP_XY - 1e-6) problems.push(`${pc.pid} (${pc.pile}) is ${d.toFixed(2)} mm from the neck`); }
   if (pc.z + pc.t > BUDGET_H + 1e-9) problems.push(`${pc.pid} (${pc.pile}) top ${(pc.z + pc.t).toFixed(1)} > ${BUDGET_H.toFixed(1)}`);
   if (pc.z > 1e-9) {   // something must hold it up: its centroid inside the hull of the pieces directly beneath it that it touches (a frame's window or a standee's notch still holds the piece above; a tray rests on the pieces standing proud of the tray below)

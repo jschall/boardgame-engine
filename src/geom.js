@@ -282,6 +282,16 @@
           return groups;
         };
         const is_regular_hex = g => { const ps = polys(g); if (ps.length !== 1) return false; const hull = g.convex_hull; if (Math.abs(hull.area - g.area) > 0.03 * g.area) return false; const b = g.bounds, w = b[2] - b[0], h = b[3] - b[1]; return Math.abs(h / w - 2 / Math.sqrt(3)) < 0.03 && Math.abs(g.area / (w * h) - 0.75) < 0.03; };
+        /* a game may lay its own sheets (TUMBLER: floors with walls standing along the sheet edge, plugs cut from the well offcuts): spec.sheets(lay, ctx)
+           opens sheets with ctx.sheet(stock) and places every needed part with lay.put / lay.put_box / lay.nest; the engine adds the box's art overlays,
+           the titles, the backs and the checks as for its own nesting */
+        if (typeof spec.sheets === 'function') {
+          spec.sheets(lay, { F, stocks: F.stocks, kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), usable, TOP, SHEET_W, SHEET_H, need: need(), outlines: lay.outlines, stock_of: pid => stock_of[pid], sheet: open_sheet, sheets });
+          const counts = need(), placed = {};
+          for (const name of sheets) for (const it of lay.layout[name].items) if (it[0] && !/^(floor-base-under|lid-outer)$/.test(it[0])) placed[it[0]] = (placed[it[0]] || 0) + 1;
+          const short = Object.entries(counts).filter(([pid, n]) => n && (placed[pid] || 0) !== n && !/-lid-up$/.test(pid) && !/-back$/.test(pid));
+          if (short.length) throw new lg.LaserCheckError(short.map(([pid, n]) => `${pid}: ${placed[pid] || 0} placed of ${n}`), 'LAYOUT PROBLEM');
+        } else
         for (const s of order) {
           const groups = grouped(s); if (!groups.length) continue;
           let sheet = open_sheet(s);
@@ -328,7 +338,7 @@
           game: spec.name, T: F.T, T_LO: F.T_LO, stocks: Object.fromEntries(stock_keys.map(k => [k, { name: F.stocks[k].name, mat: F.stocks[k].mat, t: F.stocks[k].t, tlo: F.stocks[k].tlo, kerf: F.stocks[k].kerf, params: { lo: `${k}lo`, hi: `${k}hi`, kerf: `kerf_${k}` } }])),
           part_stock, part_kind, part_name, part_key, bases, standee_of, trays, leaf_slots: lay.meta.leaf_slots || {}, box_stock: box.stock, neck_stock: box.neck || box.stock,
           INNER: F.INNER, INNER_BASE: FB.INNER, INNER_LID: FLD.INNER, OUT_BASE: FB.OUT, OUT_LID: FLD.OUT, BASE_EASE: F.BASE_EASE, LID_EASE: F.LID_EASE, WALL_H: F.WALL_H, FLOOR_UP: F.FLOOR_UP, GAP: F.GAP, NECK_H: F.NECK_H, NECK_CL: F.NECK_CL, NECK_OUT: F.NECK_OUT, TABS: F.TABS,
-          INNER_X: F.INNER_X, INNER_Y: F.INNER_Y, OUT_X: F.OUT_X, OUT_Y: F.OUT_Y, FLOOR: F.FLOOR, TABS_X: F.TABS_X, TABS_Y: F.TABS_Y, N_BANDS: F.N_BANDS, NECK_BANDS: F.NECK_BANDS, NECK_OUT_X: F.NECK_OUT_X, NECK_OUT_Y: F.NECK_OUT_Y,   /* the rectangle; a square box has INNER_X = INNER_Y = INNER */
+          INNER_X: F.INNER_X, INNER_Y: F.INNER_Y, OUT_X: F.OUT_X, OUT_Y: F.OUT_Y, FLOOR: F.FLOOR, TABS_X: F.TABS_X, TABS_Y: F.TABS_Y, N_BANDS: F.N_BANDS, NECK_BANDS: F.NECK_BANDS, NECK_OUT_X: F.NECK_OUT_X, NECK_OUT_Y: F.NECK_OUT_Y, NECK_ON: F.NECK_ON,   /* the rectangle; a square box has INNER_X = INNER_Y = INNER */
           fits: { WALL_T: F.WALL_T, FLOOR_TAB: F.FLOOR_TAB, FLOOR_SPAN: F.FLOOR_SPAN, SLOT_W: F.SLOT_W, WALL_SLOT_H: F.WALL_SLOT_H, SLOT_Y0: F.SLOT_Y0, NECK_T: F.NECK_T, NECK_FINGER: F.NECK_FINGER, BAND_NOTCH: F.BAND_NOTCH, JIG_CL: F.JIG_CL, stock_hi: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].t])), stock_lo: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].tlo])) },
           kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), sheet_stock: Object.assign({}, sheet_stock, Object.fromEntries(Object.entries(coupon_sheets).map(([n, c]) => [n, c.stock]))), coupon_sheets, sheet0_legend: legend, sheet0_size: lay.meta.sheet0_size, clamp_spots: { legs: lay.o.corner_keepout, sheet_h: SHEET_H },
           generate_ms: Date.now() - t0, stage_ms: times, cache: Object.assign({}, K.memo_stats),
