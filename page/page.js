@@ -37,21 +37,22 @@
   const standingPair = (a, b, x, y, tileZ, tilePid) => { if (!tilePid) throw new Error(`standingPair(${a}, ${b}): the tile the pair stands in must be named`); return [mk({ part: part(a), back: part(a + '-back'), vertical: true, rot: 0, x, y }), mk({ part: part(b), back: part(b + '-back'), vertical: true, rot: 90, x, y })].map(inst => posed(inst, () => ({ z: tileZ + STOCK_T(stockOf(tilePid)) }))); };
 
   /* ------------------------------------------------------------ box pieces (as in the SNOOZY viewer) */
-  /* IN is the drawn frame both trays and the neck are centred on; each tray is its ease (D.EB, D.EL) roomier on every side, the lid more than the base */
-  const IN = need(META, 'INNER', 'META');
+  /* IN is the drawn frame both trays and the neck are centred on (IX along x, IY along y: a rectangular box; IN = IX for the square-minded); each tray is
+     its ease (D.EB, D.EL) roomier on every side, the lid more than the base */
+  const IN = need(META, 'INNER', 'META'), IX = META.INNER_X || IN, IY = META.INNER_Y || IN;
   const easeOf = (D, which) => which === 'base' ? D.EB : D.EL;
   function tray(list, ox, oy, which) {
     list.push(posed(which === 'base' ? mk({ part: part('floor-base'), back: part('floor-base-under'), x: ox, y: oy }) : mk({ part: part('lid-cut'), back: part('lid-outer'), x: ox, y: oy }), D => ({ z: D.FU })));
     walls(list, ox, oy, which, 'WH');
   }
   function walls(list, ox, oy, which, zkey) {
-    const w = s => part(`wall-${s}-${which}`), at = D => { const e = easeOf(D, which); return [ox - e, oy - e, IN + 2 * e]; };   /* this tray's inside corner and span */
-    list.push(posed(mk({ part: w('S'), vertical: true, rot: 0 }), D => { const [x0, y0, I] = at(D); return { x: x0 - D.WT, y: y0 + I + D.WT - D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('E'), vertical: true, rot: -90 }), D => { const [x0, y0, I] = at(D); return { x: x0 + I + D.WT - D.T3 / 2, y: y0 + I + D.WT, z: D[zkey] }; }),
-      posed(mk({ part: w('N'), vertical: true, rot: 180 }), D => { const [x0, y0, I] = at(D); return { x: x0 + I + D.WT, y: y0 - D.WT + D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('W'), vertical: true, rot: 90 }), D => { const [x0, y0, I] = at(D); return { x: x0 - D.WT + D.T3 / 2, y: y0 - D.WT, z: D[zkey] }; }));
+    const w = s => part(`wall-${s}-${which}`), at = D => { const e = easeOf(D, which); return [ox - e, oy - e, IX + 2 * e, IY + 2 * e]; };   /* this tray's inside corner and spans */
+    list.push(posed(mk({ part: w('S'), vertical: true, rot: 0 }), D => { const [x0, y0, , J] = at(D); return { x: x0 - D.WT, y: y0 + J + D.WT - D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('E'), vertical: true, rot: -90 }), D => { const [x0, y0, I, J] = at(D); return { x: x0 + I + D.WT - D.T3 / 2, y: y0 + J + D.WT, z: D[zkey] }; }),
+      posed(mk({ part: w('N'), vertical: true, rot: 180 }), D => { const [x0, y0, I] = at(D); return { x: x0 + I + D.WT, y: y0 - D.WT + D.T3 / 2, z: D[zkey] }; }), posed(mk({ part: w('W'), vertical: true, rot: 90 }), D => { const [x0, y0] = at(D); return { x: x0 - D.WT + D.T3 / 2, y: y0 - D.WT, z: D[zkey] }; }));
   }
   function neck(list, ox, oy, zkey) {
-    list.push(posed(mk({ part: part('neck-A'), vertical: true, rot: 0 }), D => ({ x: ox + D.NCL, y: oy + IN - D.NCL - D.TW / 2, z: D[zkey] })), posed(mk({ part: part('neck-A'), vertical: true, rot: 180 }), D => ({ x: ox + IN - D.NCL, y: oy + D.NCL + D.TW / 2, z: D[zkey] })),
-      posed(mk({ part: part('neck-B'), vertical: true, rot: -90 }), D => ({ x: ox + IN - D.NCL - D.TW / 2, y: oy + IN - D.NCL, z: D[zkey] })), posed(mk({ part: part('neck-B'), vertical: true, rot: 90 }), D => ({ x: ox + D.NCL + D.TW / 2, y: oy + D.NCL, z: D[zkey] })));
+    list.push(posed(mk({ part: part('neck-A'), vertical: true, rot: 0 }), D => ({ x: ox + D.NCL, y: oy + IY - D.NCL - D.TW / 2, z: D[zkey] })), posed(mk({ part: part('neck-A'), vertical: true, rot: 180 }), D => ({ x: ox + IX - D.NCL, y: oy + D.NCL + D.TW / 2, z: D[zkey] })),
+      posed(mk({ part: part('neck-B'), vertical: true, rot: -90 }), D => ({ x: ox + IX - D.NCL - D.TW / 2, y: oy + IY - D.NCL, z: D[zkey] })), posed(mk({ part: part('neck-B'), vertical: true, rot: 90 }), D => ({ x: ox + D.NCL + D.TW / 2, y: oy + D.NCL, z: D[zkey] })));
   }
 
 
@@ -65,7 +66,7 @@
   function addAsm(id, group, name, desc, rep, build, opts) { ASMS[id] = Object.assign({ group, name, desc, rep, build }, opts || {}); }
   function trayEx(L, which) { const i0 = L.length; tray(L, 0, 0, which); exFor(L[i0]); [[0, 45, 0], [45, 0, 0], [0, -45, 0], [-45, 0, 0]].forEach((d, i) => exFor(L[i0 + 1 + i], d)); }
   function neckEx(L, dz) { const i0 = L.length; neck(L, 0, 0, 'NECK_TOP'); L.slice(i0).forEach(n => exFor(n, [0, 0, dz])); }
-  function lidOn(L) { const i0 = L.length; L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IN, y: IN }), D => ({ z: D.LID_FLOOR }))); walls(L, 0, 0, 'lid-up', 'LID_TOP'); L.slice(i0).forEach(x => exFor(x, [0, 0, 110])); }
+  function lidOn(L) { const i0 = L.length; L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IX, y: IY }), D => ({ z: D.LID_FLOOR }))); walls(L, 0, 0, 'lid-up', 'LID_TOP'); L.slice(i0).forEach(x => exFor(x, [0, 0, 110])); }
 
   /* ------------------------------------------------------------ timing (declared before the game, whose animations call tween and wait) */
   let paused = true, speed = 1, runId = 0, lifted = 0; const CANCEL = { cancel: true };
@@ -84,7 +85,7 @@
   const countIllegal = (e, why) => { illegal++; log(`<b>ILLEGAL</b> ${escH(e.type)}: ${escH(why)}`, 'sys'); };
 
   /* ------------------------------------------------------------ GAME: everything the game brings, through one call */
-  const api = { S, R3, META, PARTS, PACKING, JIG, SHOWCASE, scene, $, el, need, part, mk, posed, setPose, rotXY, ez, STOCK_T, STOCK_MAT, stockOf, kindOf, isVertical, DIM, IN, tray, walls, neck, standingPair, standee, exFor, addAsm, trayEx, neckEx, lidOn,
+  const api = { S, R3, META, PARTS, PACKING, JIG, SHOWCASE, scene, $, el, need, part, mk, posed, setPose, rotXY, ez, STOCK_T, STOCK_MAT, stockOf, kindOf, isVertical, DIM, IN, IX, IY, tray, walls, neck, standingPair, standee, exFor, addAsm, trayEx, neckEx, lidOn,
     tween, uiTween, wait, arc, log, escH, pick, illegal: countIllegal, markDirty: () => { dirty = true; }, get qr() { return qr; }, get G() { return G; },
     focus: { get cell() { return focusCell; }, set cell(v) { focusCell = v; } } };
   const GT = GameTable(api);
@@ -105,9 +106,9 @@
   Object.assign(api, { dot, say, NAMES, COLC, chips });
 
   /* ------------------------------------------------------------ the box (machinery for the shoulder box) */
-  const B = { static: [], dynamic: [], lid: [], home: { pitch: 72, yaw: -32, dist: 1400, cx: IN / 2, cy: IN / 2, cz: 26, view: 330 } };   /* low enough to see the shadow line */
+  const B = { static: [], dynamic: [], lid: [], home: { pitch: 72, yaw: -32, dist: 1400, cx: IX / 2, cy: IY / 2, cz: 26, view: 330 * Math.max(1, Math.max(IX, IY) / 190) } };   /* low enough to see the shadow line */
   tray(B.static, 0, 0, 'base'); neck(B.static, 0, 0, 'NECK_TOP');
-  B.lid.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IN, y: IN }), D => ({ z: D.LID_FLOOR }))); walls(B.lid, 0, 0, 'lid-up', 'LID_TOP');
+  B.lid.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: IX, y: IY }), D => ({ z: D.LID_FLOOR }))); walls(B.lid, 0, 0, 'lid-up', 'LID_TOP');
   B.lid.forEach(i => i.z0 = i.z); B.dynamic = B.lid;
   /* the assemblies every game has, after the game's own: each standee on its base (META.bases), the two trays, the closed and the packed box, the box jig */
   function partName(id) { if (GT.partName) { const n = GT.partName(id); if (n) return n; } return (META.part_name || {})[id] || id.replace(/-/g, ' '); }
@@ -760,12 +761,12 @@
   function introBuild() {
     const D = DIM(), floorTop = D.FU + D.T3, IB = INTRO;
     IB.all = T.static.concat(T.dynamic).map(inst => ({ inst, end: { x: inst.x, y: inst.y, z: inst.z, rot: inst.rot, flipped: inst.flipped, hidden: inst.hidden }, shadow0: inst.shadow }));
-    IB.yE = BOXO[1] + IN + D.EL + D.WT;   /* the closed box's near face: the lid's, the roomier tray */
+    IB.yE = BOXO[1] + IY + D.EL + D.WT;   /* the closed box's near face: the lid's, the roomier tray */
     IB.base = BOXA.slice();
     /* the lid: its packed pose is the open tray carried onto the base and turned over about the box's mid-height. It flies as one rigid body:
        every part keeps its offset from the tray's centre, and one rotation (the floor's) turns them all about that moving centre */
     IB.lid = LIDA.map(inst => {
-      const tmp = Object.assign({}, inst, { x: inst.x - LIDO[0] + BOXO[0], y: inst.y - LIDO[1] + BOXO[1], group: { angle: 180, pivot: [BOXO[0] + IN / 2, BOXO[1] + IN / 2, D.LID_TOP / 2], axis: [0, 1, 0] } });
+      const tmp = Object.assign({}, inst, { x: inst.x - LIDO[0] + BOXO[0], y: inst.y - LIDO[1] + BOXO[1], group: { angle: 180, pivot: [BOXO[0] + IX / 2, BOXO[1] + IY / 2, D.LID_TOP / 2], axis: [0, 1, 0] } });
       return tweenRecord(inst, scene.basis(tmp));
     });
     const mean = k => IB.lid.reduce((a, q) => V3.add(a, q[k]), [0, 0, 0]).map(v => v / IB.lid.length);
@@ -866,21 +867,22 @@
     for (const q of pieces) { q.t0 = q.tL = IB.fromTable ? -1 : 2; q.H = 0; q.delay = 0; q.lift = 0; }
     /* the second box: built one box height further from the viewer and tipped the other way about its far edge, it stands beside the first,
        at the same depth, its underside toward the viewer; turned half a turn about its centre first, so the underside art reads the right way up */
-    const DX = IN + 2 * (D.EL + D.WT) + 46, oyB = BOXO[1] + IN + 2 * (D.EL + D.WT) + D.LID_TOP, L = [];
+    const DX = IX + 2 * (D.EL + D.WT) + 46, oyB = BOXO[1] + IY + 2 * (D.EL + D.WT) + D.LID_TOP, L = [];
     tray(L, BOXO[0] + DX, oyB, 'base'); neck(L, BOXO[0] + DX, oyB, 'NECK_TOP');
-    L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: BOXO[0] + DX + IN, y: oyB + IN }), d => ({ z: d.LID_FLOOR }))); walls(L, BOXO[0] + DX, oyB, 'lid-up', 'LID_TOP');
-    IB.tipB = { angle: -90, pivot: [0, oyB - D.EL - D.WT, 0], axis: [1, 0, 0] };   /* tipped about the lid wall's outer face, which the standing box rests on */ const turnB = { angle: 180, pivot: [BOXO[0] + DX + IN / 2, oyB + IN / 2, 0], axis: [0, 0, 1] };
+    L.push(posed(mk({ part: part('lid-cut'), back: part('lid-outer'), flipped: true, rot: 180, x: BOXO[0] + DX + IX, y: oyB + IY }), d => ({ z: d.LID_FLOOR }))); walls(L, BOXO[0] + DX, oyB, 'lid-up', 'LID_TOP');
+    IB.tipB = { angle: -90, pivot: [0, oyB - D.EL - D.WT, 0], axis: [1, 0, 0] };   /* tipped about the lid wall's outer face, which the standing box rests on */ const turnB = { angle: 180, pivot: [BOXO[0] + DX + IX / 2, oyB + IY / 2, 0], axis: [0, 0, 1] };
     L.forEach(inst => { inst.group = [turnB, IB.tipB]; }); IB.boxB = L;
     /* the camera path: keyframes in scroll progress joined by a monotone cubic, so it never stops dead or overshoots: a slow push-in on the
        pair while the title fades and the second box goes, then one crane down and round while the lights come up and the box lies down,
        then a pull back to the table's home view as the lid flies and the pieces come out. Yaw, pitch and view each move one way. */
-    const H = IN + 2 * (D.EL + D.WT), cxA = BOXO[0] + IN / 2, cyA = BOXO[1] + IN / 2, cxB = cxA + DX, home = framed(T.home);
+    const H = IY + 2 * (D.EL + D.WT), cxA = BOXO[0] + IX / 2, cyA = BOXO[1] + IY / 2, cxB = cxA + DX, home = framed(T.home);
     IB.spotAt = [(cxA + cxB) / 2, IB.yE + 10];
+    const VS = Math.max(1, (IX + IY) / 380);   /* the keyframes were framed on a 190 mm box: a bigger box is seen from proportionally further */
     IB.cam = [
-      [0.00, { pitch: 84, yaw: -24, dist: 2500, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 36, view: 560 }],
-      [0.11, { pitch: 82, yaw: -21, dist: 2350, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 26, view: 520 }],
-      [0.19, { pitch: 70, yaw: -17, dist: 1900, cx: cxA, cy: IB.yE - 30, cz: 30, view: 430 }],
-      [0.29, { pitch: 58, yaw: -12, dist: 1500, cx: cxA, cy: cyA, cz: 18, view: 400 }],
+      [0.00, { pitch: 84, yaw: -24, dist: 2500 * VS, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 36, view: 560 * VS }],
+      [0.11, { pitch: 82, yaw: -21, dist: 2350 * VS, cx: (cxA + cxB) / 2, cy: IB.yE, cz: H / 2 + 26, view: 520 * VS }],
+      [0.19, { pitch: 70, yaw: -17, dist: 1900 * VS, cx: cxA, cy: IB.yE - 30, cz: 30, view: 430 * VS }],
+      [0.29, { pitch: 58, yaw: -12, dist: 1500 * VS, cx: cxA, cy: cyA, cz: 18, view: 400 * VS }],
       [0.42, { pitch: 52, yaw: -6, dist: 2000, cx: home.cx, cy: home.cy, cz: home.cz, view: home.view * 0.9, framed: true }],
       [0.94, Object.assign({}, home, { framed: true })]];   /* framed: the view is the table's own (framed() already sized it for this viewport), so the game's first frame is the opening's last and the camera never steps */
   }

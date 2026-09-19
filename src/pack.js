@@ -43,7 +43,7 @@ for (const [pid, inner] of Object.entries(PJ.parts)) {
   OUTLINES[pid] = !model ? polys(p.cut.buffer(-kerf_of(pid) / 2, { join_style: 'mitre', mitre_limit: 4.0 })).sort((a, b) => b.area - a.area)[0] : p.cut;
 }
 const BOX_T = META.stocks[META.box_stock].t;
-const K = { T: BOX_T, TW: META.stocks[META.neck_stock].t, INNER: META.INNER, WALL_H: META.WALL_H, FLOOR_UP: META.FLOOR_UP, GAP: META.GAP, NECK_H: META.NECK_H, NECK_CL: META.NECK_CL };
+const K = { T: BOX_T, TW: META.stocks[META.neck_stock].t, INNER: META.INNER, INNER_X: META.INNER_X || META.INNER, INNER_Y: META.INNER_Y || META.INNER, WALL_H: META.WALL_H, FLOOR_UP: META.FLOOR_UP, GAP: META.GAP, NECK_H: META.NECK_H, NECK_CL: META.NECK_CL };
 const r2 = v => pyround(v, 2), r3 = v => pyround(v, 3);
 const SLACK = 1.0, GAP_XY = 0.5, PLY_TOL = 0.2, POCKET_CLEARANCE = require('./stock.js').DESIGN.POCKET_CLEARANCE;
 
@@ -51,9 +51,10 @@ const SLACK = 1.0, GAP_XY = 0.5, PLY_TOL = 0.2, POCKET_CLEARANCE = require('./st
 const NECK_T = (META.fits && META.fits.NECK_T !== undefined) ? META.fits.NECK_T : K.TW;
 const FLOOR_TOP = K.FLOOR_UP + K.T;                                  // 6 at T = 3
 if (!Number.isFinite(META.NECK_OUT)) throw new Error('META.NECK_OUT is required for the real neck datum');
-const NECK_OFFSET = (K.INNER - META.NECK_OUT) / 2;
+const NECK_OFFSET = (K.INNER - META.NECK_OUT) / 2;                      // the same on every side: the neck body sits NECK_CL in from the frame
 const NECK_IN0 = NECK_OFFSET + NECK_T;                                 // inner face of the W / S neck board
-const NECK_IN1 = K.INNER - NECK_OFFSET - NECK_T;                       // inner face of the E / N neck board
+const NECK_IN1 = K.INNER_X - NECK_OFFSET - NECK_T;                     // inner face of the E neck board
+const NECK_IN1Y = K.INNER_Y - NECK_OFFSET - NECK_T;                    // inner face of the N neck board
 const NECK_TOP = FLOOR_TOP + K.NECK_H;
 const LID_RIM = K.WALL_H + K.GAP;                                    // the lid is the same tray upside down, its rim GAP above the base rim
 const LID_FLOOR_UNDER = LID_RIM + (K.WALL_H - K.FLOOR_UP - K.T);     // its floor's inside face (= LID_RIM + SLOT_Y0 when the slot is exactly T)
@@ -61,8 +62,8 @@ if (Math.abs(LID_FLOOR_UNDER - NECK_TOP) > 1e-9) throw new Error(`neck top ${NEC
 if (META.fits && META.fits.SLOT_Y0 !== undefined && META.fits.SLOT_Y0 > K.WALL_H - K.FLOOR_UP - K.T + 1e-9) throw new Error('wall slot top is beyond the floor');
 const USABLE_H = LID_FLOOR_UNDER - FLOOR_TOP;
 const BUDGET_H = USABLE_H - SLACK;
-const INTERIOR = sbox(NECK_IN0, NECK_IN0, NECK_IN1, NECK_IN1);
-const NECK_RING = sbox(NECK_OFFSET, NECK_OFFSET, K.INNER - NECK_OFFSET, K.INNER - NECK_OFFSET).difference(INTERIOR);
+const INTERIOR = sbox(NECK_IN0, NECK_IN0, NECK_IN1, NECK_IN1Y);
+const NECK_RING = sbox(NECK_OFFSET, NECK_OFFSET, K.INNER_X - NECK_OFFSET, K.INNER_Y - NECK_OFFSET).difference(INTERIOR);
 
 /* a piece's stacking thickness: its stock's thickest reading plus the ply tolerance */
 function thick(pid) { const s = META.part_stock[pid]; if (!s || !META.stocks[s]) throw new Error(`${pid}: no stock in META.part_stock`); return META.stocks[s].t + PLY_TOL; }
@@ -317,7 +318,7 @@ const npcs = q => q.pids.reduce((s, st) => s + st[2].length, 0);
 
 const f1 = v => v.toFixed(1);
 console.log(`${CFG.name} packing check`);
-console.log(`  interior inside the neck: ${f1(NECK_IN1 - NECK_IN0)} x ${f1(NECK_IN1 - NECK_IN0)} mm (x, y ${f1(NECK_IN0)}..${f1(NECK_IN1)} from the tray's inside corner) = ${INTERIOR.area.toFixed(0)} mm2`);
+console.log(`  interior inside the neck: ${f1(NECK_IN1 - NECK_IN0)} x ${f1(NECK_IN1Y - NECK_IN0)} mm (x ${f1(NECK_IN0)}..${f1(NECK_IN1)}, y ${f1(NECK_IN0)}..${f1(NECK_IN1Y)} from the tray's inside corner) = ${INTERIOR.area.toFixed(0)} mm2`);
 console.log(`  height floor top z ${f1(FLOOR_TOP)} to lid floor underside z ${f1(LID_FLOOR_UNDER)} (box closed): ${f1(USABLE_H)} mm; budget after ${SLACK.toFixed(0)} mm slack ${f1(BUDGET_H)} mm`);
 console.log(`  stacking thickness ${Object.entries(META.stocks).map(([k, st]) => `${st.name} ${st.t} -> ${f1(st.t + PLY_TOL)}`).join(', ')} mm; ${GAP_XY} mm between neighbours`);
 console.log(`  ${pieces.length} pieces in ${placed.length} piles`);
@@ -333,7 +334,7 @@ const out = {
   coords: "box coordinates: origin at the inside corner of the base tray floor (the floor part's drawing origin), z = bottom of the piece above the floor top; " +
     "piece outline = OUTLINES[pid] rotated rot degrees about its own origin (as the renderer's flat instance) then moved by (x, y)",
   interior: {
-    x0: NECK_IN0, y0: NECK_IN0, x1: NECK_IN1, y1: NECK_IN1, width: NECK_IN1 - NECK_IN0, depth: NECK_IN1 - NECK_IN0, floor_top_z_in_tray: FLOOR_TOP,
+    x0: NECK_IN0, y0: NECK_IN0, x1: NECK_IN1, y1: NECK_IN1Y, width: NECK_IN1 - NECK_IN0, depth: NECK_IN1Y - NECK_IN0, floor_top_z_in_tray: FLOOR_TOP,
     lid_floor_underside_z_in_tray: LID_FLOOR_UNDER, height: USABLE_H, slack: SLACK, height_budget: BUDGET_H, ply_tolerance: PLY_TOL, gap_xy: GAP_XY,
     tallest: r2(max_top), height_margin: r2(BUDGET_H - max_top), free_floor_mm2: Math.round(free_floor), floor_mm2: Math.round(INTERIOR.area),
     stock: Object.fromEntries(Object.entries(META.stocks).map(([k, s]) => [k, s.t])), parts: path.relative(HERE, path.resolve(PARTS_FILE)),
@@ -350,14 +351,14 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 const pathd = g => polys(g).map(p => [p.exterior, ...p.interiors].map(r => 'M' + r.coords.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join('L') + 'Z').join('')).join('');
 const pack_dir = path.join(OUTDIR, 'pack'); fs.mkdirSync(pack_dir, { recursive: true });
 const tiers = [...new Set(placed.map(q => q.tier))].sort((a, b) => a - b);
-const lo = -K.T - 2, hi = K.INNER + K.T + 2, S = 4.0, M = 70, PW = (hi - lo) * S + 2 * M;   // px per mm, margin for title and axes
+const lo = -K.T - 2, hi = Math.max(K.INNER_X, K.INNER_Y) + K.T + 2, S = 4.0, M = 70, PW = (hi - lo) * S + 2 * M;   // px per mm, margin for title and axes
 const X = x => M + (x - lo) * S, Y = y => M + (hi - y) * S;
 const wrote = [];
 for (const tier of tiers) {
   const g = [];
   const shape = (geom, style) => `<path d="${pathd(geom)}" fill-rule="evenodd" ${style} vector-effect="non-scaling-stroke"/>`;
   g.push(`<g transform="translate(${M - lo * S},${M + hi * S}) scale(${S},${-S})">`);
-  g.push(shape(sbox(-K.T, -K.T, K.INNER + K.T, K.INNER + K.T).difference(sbox(0, 0, K.INNER, K.INNER)), 'fill="#d9c7a3" stroke="black" stroke-width="0.5"'));
+  g.push(shape(sbox(-K.T, -K.T, K.INNER_X + K.T, K.INNER_Y + K.T).difference(sbox(0, 0, K.INNER_X, K.INNER_Y)), 'fill="#d9c7a3" stroke="black" stroke-width="0.5"'));
   g.push(shape(NECK_RING, 'fill="#6b4a2b" stroke="black" stroke-width="0.8"'));
   for (const q of placed) if (q.tier < tier) g.push(shape(q.fp, 'fill="#e4e4e4" stroke="#aaaaaa" stroke-width="0.5"'));
   const labels = [];
@@ -370,12 +371,12 @@ for (const tier of tiers) {
   });
   g.push('</g>');
   const ticks = [];
-  for (let v = 0; v <= K.INNER; v += 25) {
+  for (let v = 0; v <= Math.max(K.INNER_X, K.INNER_Y); v += 25) {
     ticks.push(`<line x1="${X(v)}" y1="${Y(lo)}" x2="${X(v)}" y2="${Y(lo) + 5}" stroke="black"/><text x="${X(v)}" y="${Y(lo) + 18}" font-size="12" text-anchor="middle">${v}</text>`);
     ticks.push(`<line x1="${X(lo)}" y1="${Y(v)}" x2="${X(lo) - 5}" y2="${Y(v)}" stroke="black"/><text x="${X(lo) - 8}" y="${Y(v) + 4}" font-size="12" text-anchor="end">${v}</text>`);
   }
   const title = `${esc(CFG.name)} packed box, layer ${tier} (${tier === 0 ? 'on the floor' : 'on top of layer ' + (tier - 1)}; grey = below)`;
-  const sub = `interior ${f1(NECK_IN1 - NECK_IN0)} mm square, ${USABLE_H.toFixed(0)} mm tall; verdict ${fits ? 'FITS' : 'DOES NOT FIT'}, margin ${f1(BUDGET_H - max_top)} mm`;
+  const sub = `interior ${f1(NECK_IN1 - NECK_IN0)} x ${f1(NECK_IN1Y - NECK_IN0)} mm, ${USABLE_H.toFixed(0)} mm tall; verdict ${fits ? 'FITS' : 'DOES NOT FIT'}, margin ${f1(BUDGET_H - max_top)} mm`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${PW}" height="${PW}" font-family="DejaVu Sans, sans-serif"><rect width="${PW}" height="${PW}" fill="white"/>` +
     `<text x="${PW / 2}" y="24" font-size="15" text-anchor="middle">${title}</text><text x="${PW / 2}" y="44" font-size="15" text-anchor="middle">${esc(sub)}</text>` +
     g.join('') + `<rect x="${X(lo)}" y="${Y(hi)}" width="${(hi - lo) * S}" height="${(hi - lo) * S}" fill="none" stroke="black"/>` + ticks.join('') + labels.join('') +

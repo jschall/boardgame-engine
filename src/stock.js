@@ -65,7 +65,7 @@
     }
     return D;
   }
-  /** every finished dimension for one parameter set P over the game's stocks. box: { stock, neck (stock key), inner } */
+  /** every finished dimension for one parameter set P over the game's stocks. box: { stock, neck (stock key), inner (a side, or [x, y]), wall_h, floor: 'raised' | 'flush', gap } */
   function derive(stocks, P, box) {
     const S = {};
     for (const k of Object.keys(stocks)) {
@@ -77,28 +77,40 @@
     }
     if (!box || !S[box.stock]) throw new Error(`box.stock names no stock: ${box && box.stock}`);
     const neckKey = box.neck || box.stock; if (!S[neckKey]) throw new Error(`box.neck names no stock: ${neckKey}`);
-    const B = S[box.stock], N = S[neckKey], D = DESIGN, INNER = box.inner;
-    if (!(INNER >= 80 && INNER <= 400)) throw new Error(`box.inner must be 80 to 400 mm, got ${INNER}`);
+    const B = S[box.stock], N = S[neckKey], D = DESIGN;
+    /* the drawn frame: box.inner is one number (a square) or [x, y] (a rectangle: x is the S and N walls' span, y the E and W walls'); INNER stays the
+       x span for everything square-minded, INNER_X / INNER_Y carry the rectangle (TUMBLER: a 270 x 360 board is the base floor, owner 2026-09-18) */
+    const [INNER_X, INNER_Y] = Array.isArray(box.inner) ? box.inner : [box.inner, box.inner], INNER = INNER_X;
+    for (const v of [INNER_X, INNER_Y]) if (!(v >= 80 && v <= 400)) throw new Error(`box.inner must be 80 to 400 mm a side, got ${JSON.stringify(box.inner)}`);
     const WALL_H = box.wall_h || D.WALL_H;
-    if (!(WALL_H >= 24 && WALL_H <= 40)) throw new Error(`box.wall_h must be 24 to 40 mm, got ${WALL_H}: the glue jig's springs bear 20 to 22 mm up the wall and were validated at 24 (a shorter wall overstresses them)`);
-    const WALL_T = B.t + FIT.finger, OUT = INNER + 2 * WALL_T;
-    const NECK_H = 2 * WALL_H + D.GAP - 2 * (D.FLOOR_UP + B.t);
+    if (!(WALL_H >= 12 && WALL_H <= 40)) throw new Error(`box.wall_h must be 12 to 40 mm, got ${WALL_H}`);
+    /* the floor: 'raised' (the default: FLOOR_UP above the wall's bottom edge, its tabs through slots in the walls) or 'flush' (on the bottom edge,
+       its tabs into notches open at that edge: TUMBLER's shallow trays, whose floor is the board's own base layer) */
+    const FLOOR = box.floor || 'raised'; if (!['raised', 'flush'].includes(FLOOR)) throw new Error(`box.floor is 'raised' or 'flush', got ${FLOOR}`);
+    const FLOOR_UP = FLOOR === 'flush' ? 0 : D.FLOOR_UP;
+    const GAP = box.gap || D.GAP; if (!(GAP >= 1.5 && GAP <= 6)) throw new Error(`box.gap (the shadow line) must be 1.5 to 6 mm, got ${GAP}`);
+    const WALL_T = B.t + FIT.finger, OUT_X = INNER_X + 2 * WALL_T, OUT_Y = INNER_Y + 2 * WALL_T, OUT = OUT_X;
+    const NECK_H = 2 * WALL_H + GAP - 2 * (FLOOR_UP + B.t);
     const WALL_SLOT_H = B.t + FIT.slot;
+    /* the corner fingers: three bands a wall (the outer two to the S and N walls) while a band is 6 mm or more, else two (the rim band to the S and
+       N walls: one chunky finger each, as TUMBLER's 12.5 mm walls were drawn); the neck likewise five bands or three */
+    const N_BANDS = WALL_H / 3 >= 6 ? 3 : 2, NECK_BANDS = NECK_H / 5 >= 6 ? 5 : 3;
     for (const [name, width, projection] of [
-      ['floor tab', D.TAB_W, B.t + FIT.tab_proud], ['corner finger', WALL_H / 3 - 2 * FIT.band_notch, B.t + FIT.finger],
-      ['neck finger', NECK_H / 5 - 2 * FIT.band_notch, N.tlo - FIT.neck_finger_under]])
+      ['floor tab', D.TAB_W, B.t + FIT.tab_proud], ['corner finger', WALL_H / N_BANDS - 2 * FIT.band_notch, B.t + FIT.finger],
+      ['neck finger', NECK_H / NECK_BANDS - 2 * FIT.band_notch, N.tlo - FIT.neck_finger_under]])
       if (width < FIT.min_width || projection < FIT.min_projection) throw new Error(`${name}: ${width} x ${projection} mm is below the load-bearing minimum`);
     /** the number and centres of the floor tabs along a side of the box: 60 mm apart, centred */
-    const n_tabs = Math.max(2, Math.min(4, Math.floor(INNER / 60)));
-    const TABS = Array.from({ length: n_tabs }, (_, i) => INNER / 2 + (i - (n_tabs - 1) / 2) * 60);
+    const tabs_along = L => { const n = Math.max(2, Math.min(4, Math.floor(L / 60))); return Array.from({ length: n }, (_, i) => L / 2 + (i - (n - 1) / 2) * 60); };
+    const TABS_X = tabs_along(INNER_X), TABS_Y = tabs_along(INNER_Y), TABS = TABS_X;
     const F = {
       stocks: S, box_stock: box.stock, neck_stock: neckKey,
-      INNER, INNER0: INNER, OUT, WALL_H, WALL_T, FLOOR_UP: D.FLOOR_UP, GAP: D.GAP, TAB_W: D.TAB_W, TABS, BAND: WALL_H / 3,
+      INNER, INNER0: INNER, INNER_X, INNER_Y, INNER0_X: INNER_X, INNER0_Y: INNER_Y, SQUARE: INNER_X === INNER_Y, OUT, OUT_X, OUT_Y, WALL_H, WALL_T, FLOOR, FLOOR_UP, GAP, TAB_W: D.TAB_W, TABS, TABS_X, TABS_Y, N_BANDS, BAND: WALL_H / N_BANDS,
       T: B.t, T_LO: B.tlo, KERF: B.kerf,
-      FLOOR_TAB: B.t + FIT.tab_proud, FLOOR_EDGE: FIT.finger, FLOOR_SPAN: INNER + 2 * FIT.finger,
+      FLOOR_TAB: B.t + FIT.tab_proud, FLOOR_EDGE: FIT.finger, FLOOR_SPAN: INNER + 2 * FIT.finger, FLOOR_SPAN_X: INNER_X + 2 * FIT.finger, FLOOR_SPAN_Y: INNER_Y + 2 * FIT.finger,
       EASE: 0, TRAY: null, BASE_EASE: FIT.base_ease, LID_EASE: FIT.lid_ease, BAND_NOTCH: FIT.band_notch, CORE_RELIEF: FIT.core_relief,
-      SLOT_W: D.TAB_W, WALL_SLOT_H, SLOT_Y0: WALL_H - D.FLOOR_UP - WALL_SLOT_H,
-      NECK_H, NECK_BAND: NECK_H / 5, NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
+      SLOT_W: D.TAB_W, WALL_SLOT_H, SLOT_Y0: WALL_H - FLOOR_UP - WALL_SLOT_H,
+      NECK_H, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
+      NECK_OUT_X: INNER_X + 2 * FIT.finger - 2 * FIT.neck_cl, NECK_OUT_Y: INNER_Y + 2 * FIT.finger - 2 * FIT.neck_cl,
       JIG_CL: D.JIG_CL,
       /** a standee cut from stock `s` standing in a base or tile of stock `b`: its tab depth, and the slot it needs */
       standee: (s, b) => { const st = S[s], bs = S[b]; if (!st || !bs) throw new Error(`standee: unknown stock ${s} or ${b}`);
@@ -114,7 +126,8 @@
   function tray(F, which) {
     if (which !== 'base' && which !== 'lid') throw new Error(`tray: 'base' or 'lid', not ${which}`);
     const e = which === 'base' ? F.BASE_EASE : F.LID_EASE;
-    return Object.freeze(Object.assign({}, F, { TRAY: which, EASE: e, INNER: F.INNER + 2 * e, OUT: F.OUT + 2 * e, FLOOR_SPAN: F.FLOOR_SPAN + 2 * e }));   /* INNER0 stays the drawn frame */
+    return Object.freeze(Object.assign({}, F, { TRAY: which, EASE: e, INNER: F.INNER + 2 * e, OUT: F.OUT + 2 * e, FLOOR_SPAN: F.FLOOR_SPAN + 2 * e,
+      INNER_X: F.INNER_X + 2 * e, INNER_Y: F.INNER_Y + 2 * e, OUT_X: F.OUT_X + 2 * e, OUT_Y: F.OUT_Y + 2 * e, FLOOR_SPAN_X: F.FLOOR_SPAN_X + 2 * e, FLOOR_SPAN_Y: F.FLOOR_SPAN_Y + 2 * e }));   /* INNER0 stays the drawn frame */
   }
   /** the nominal frame the art is drawn in: each stock at its nominal thickness, kerf 0.15 (art never depends on the measured stock) */
   function nominal_params(stocks) {
