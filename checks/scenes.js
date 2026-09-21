@@ -30,17 +30,22 @@ module.exports = function (PARTS, DATA) {
   const SHOW = JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'showcase.json'), 'utf8'));
   // Match build.js: the two jig assemblies use their own cut shapes and assembled
   // placements. Extend the caller's parts and kerfs so fitcheck can sample them too.
-  const jig = JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'jig.json'), 'utf8'));
-  if (jig.meta.kerf_comp !== DATA.meta.kerf_comp) throw new Error('jig.json and parts.json must use the same kerf compensation mode');
-  const JV = require(path.join(__dirname, '..', 'src', 'jig_view.js'));   // shared with build.js so the page and this harness never disagree
-  const jigStock = JV.jig_stock(jig, DATA.meta);
-  for (const [id, body] of Object.entries(jig.parts)) {
-    const pid = JV.JIG_PREFIX + id;
-    PARTS[pid] = body;
-    DATA.meta.part_stock[pid] = jigStock;
-    DATA.meta.part_kerf[pid] = jig.meta.part_kerf[id];
+  /* a game whose box takes no glue jig (TUMBLER: a short flush tray) has no jig.json; the page runs without one */
+  const jigFile = path.join(GAME_DIR, 'jig.json');
+  const jig = fs.existsSync(jigFile) ? JSON.parse(fs.readFileSync(jigFile, 'utf8')) : null;
+  let JIG = null;
+  if (jig) {
+    if (jig.meta.kerf_comp !== DATA.meta.kerf_comp) throw new Error('jig.json and parts.json must use the same kerf compensation mode');
+    const JV = require(path.join(__dirname, '..', 'src', 'jig_view.js'));   // shared with build.js so the page and this harness never disagree
+    const jigStock = JV.jig_stock(jig, DATA.meta);
+    for (const [id, body] of Object.entries(jig.parts)) {
+      const pid = JV.JIG_PREFIX + id;
+      PARTS[pid] = body;
+      DATA.meta.part_stock[pid] = jigStock;
+      DATA.meta.part_kerf[pid] = jig.meta.part_kerf[id];
+    }
+    JIG = JV.jig_view(jig);
   }
-  const JIG = JV.jig_view(jig);
 
   // ---- a stub DOM: every element exists and swallows what the page does to it
   const fake = () => new Proxy(function () {}, {
@@ -58,16 +63,28 @@ module.exports = function (PARTS, DATA) {
   });
   const elements = new Map();
   const document = { getElementById: id => { if (!elements.has(id)) elements.set(id, fake()); return elements.get(id); }, createElement: () => fake(), querySelectorAll: () => [], body: fake() };
-  const window = { addEventListener() {}, location: { hash: '' } };
+  const window = { addEventListener() {}, location: { hash: '', search: '', pathname: '/page.html', href: 'file:///page.html' } };
   /* The camera and canvas size are inert here, but they must EXIST: page.js reads scene.cam.right/up in framed() and scene.W / scene.H when it
-     frames a mode, so a stub without them throws and fitcheck goes blind while the browser still draws. Same shape as render3d's this.cam. */
+     frames a mode, and fitTable projects every instance's corners (basis, world, project), so a stub without them throws and fitcheck goes blind
+     while the browser still draws. Same shape as render3d's this.cam and basis(); the projection is a fixed overhead camera. */
   class Scene {
     constructor(canvas, opts) {
       this.opts = Object.assign({}, opts); this.static = []; this.dynamic = [];
-      this.W = 1400; this.H = 1000;
+      this.W = 1400; this.H = 1000; this.f = 1000;
       this.cam = { pos: [0, 0, 1000], v: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] };
     }
     setView(v) { Object.assign(this.opts, v || {}); } render() {} resize() {} ring() {}
+    basis(inst) {
+      const r = (inst.rot || 0) * Math.PI / 180, c = Math.cos(r), s = Math.sin(r), sc = inst.scale || 1, t = inst.thick || 3;
+      if (inst.vertical) { const N = [-s, c, 0]; return { O: [inst.x - N[0] * t / 2, inst.y - N[1] * t / 2, inst.z], U: [c * sc, s * sc, 0], V: [0, 0, inst.flipV ? sc : -sc], N }; }
+      return { O: [inst.x, inst.y, inst.z], U: [c * sc, s * sc, 0], V: [-s * sc, c * sc, 0], N: [0, 0, 1] };
+    }
+    world(B, u, v, h) { return [B.O[0] + B.U[0] * u + B.V[0] * v + B.N[0] * h, B.O[1] + B.U[1] * u + B.V[1] * v + B.N[1] * h, B.O[2] + B.U[2] * u + B.V[2] * v + B.N[2] * h]; }
+    project(x, y, z) {
+      const c = this.cam, rx = x - c.pos[0], ry = y - c.pos[1], rz = z - c.pos[2];
+      const depth = rx * c.v[0] + ry * c.v[1] + rz * c.v[2], sx = rx * c.right[0] + ry * c.right[1] + rz * c.right[2], sy = rx * c.up[0] + ry * c.up[1] + rz * c.up[2];
+      const k = this.f / Math.max(depth, 1); return [this.W / 2 + sx * k, this.H / 2 - sy * k, depth];
+    }
   }
   const Render3D = { parsePart: R3.parsePart, Scene, prepareTextures: () => Promise.resolve() };
   const globals = {
