@@ -120,7 +120,7 @@
       layout: P => ({ registration: 'crosses', cross_length: 3, cross_edge: 'bottom', mark_gap: 0.25, center_along: typeof spec.sheets !== 'function', center_across: typeof spec.sheets !== 'function', corner_marks: 'score', corner_keepout: 15, margin_x: (spec.sheet && spec.sheet.margin_x) || 3.0, margin_bottom: (spec.sheet && spec.sheet.margin_bottom) || 3.0,
         sheet_w: (spec.sheet && spec.sheet.w) || SHEET_W, sheet_h: (spec.sheet && spec.sheet.h) || SHEET_H,
         speck_area: 0.12, speck_len: 0.5, back_of: { 'floor-base': 'floor-base-map', 'lid-cut': 'lid-inner' }, title_prefix: (spec.name || 'GAME') + ' ',
-        compensate: true, kerf: P[`kerf_${box.stock}`], eng_store: GAME.eng_store || null, edge_scores: true, vector_fill: { pitch: 25.4 / 100 } }),
+        compensate: true, kerf: P[`kerf_${box.stock}`], eng_store: GAME.eng_store || null, edge_scores: true, vector_fill: { pitch: 0.1 }   /* 100 lines per centimetre (owner, 2026-09-21) */ }),
       need,
       register_fonts: K.register_fonts, set_store: K.set_store, warnings: K.warnings,
       onprogress: null, eng_store: null, part_filter: null, parts_only: false, on_part: null,
