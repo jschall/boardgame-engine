@@ -66,10 +66,22 @@ module.exports = function build(GAME_DIR, argv) {
       return `<script type="text/plain" class="sheet-svg" data-sheet-id="${id}">${svgs[id]}</script>`;
     }).join('\n');
   }
+  /* the stock a sheet is cut from, by name (META.sheet_stock: sheet id -> stock key) */
+  const stockOfSheet = id => { const k = META.sheet_stock && META.sheet_stock[id]; if (!k || !META.stocks[k]) throw new Error(`sheet ${id}: no stock in META.sheet_stock`); return META.stocks[k]; };
+  /* the raw materials list (owner, 2026-09-21): how many sheets of each stock the production sheets take, at the sheet size, plus scrap for the test strips */
+  function materials_list(group) {
+    const per = new Map();
+    for (const sheet of group.sheets) { const st = stockOfSheet(sheet.id); per.set(st.name, (per.get(st.name) || 0) + 1); }
+    const items = [...per.entries()].map(([name, n]) => `<li><b>${n}</b> sheet${n > 1 ? 's' : ''} of <b>${esc(name)}</b>, ${META.sheet_w} × ${META.sheet_h} mm</li>`).join('');
+    const tests = SHEET_GROUPS.find(g => g.id === 'test-sheets');
+    const testNames = tests ? [...new Set(tests.sheets.filter(sh => META.sheet_stock && META.sheet_stock[sh.id]).map(sh => stockOfSheet(sh.id).name))] : [];
+    return `<div class="materials"><h4>Raw materials</h4><ul>${items}</ul>${testNames.length ? `<p class="muted">Plus scrap of ${testNames.map(esc).join(', ')} for the test strips below.</p>` : ''}</div>`;
+  }
   function sheet_groups(svgs) {
     const seen = new Set();
     const groups = SHEET_GROUPS.map(group => `<section class="sheet-group" id="${group.id}" aria-labelledby="${group.id}-title">
       <h3 id="${group.id}-title">${group.name}</h3>
+  ${group.id === 'production-sheets' ? materials_list(group) : ''}
   ${group.id === 'test-sheets' ? '<p class="muted">Fit tests, kerf coupons and assembly jigs. Each download is separate from the production sheets. Standalone base tests and jigs retain the stock and kerf recorded in their files when the stock panel changes.</p>' : ''}
       ${group.id === 'test-sheets' ? '<div class="test-sheet-grid">' : ''}${group.sheets.map(sheet => {
         if (group.id === 'test-sheets') {
@@ -78,7 +90,7 @@ module.exports = function build(GAME_DIR, argv) {
           seen.add(id);
           return `<article class="sheet test-card" id="sheet-${id}" data-sheet-id="${id}" data-generated="${!sheet.file}" data-description="${esc(sheet.description)}">
             <button class="sheet-preview" type="button" aria-label="Preview ${esc(sheet.name)}"><img alt="${esc(sheet.name)}" loading="lazy"></button>
-            <h4>${esc(sheet.name)}</h4><a download="${esc(sheet.name)}.svg">Download SVG</a>
+            <h4>${esc(sheet.name)}${META.sheet_stock && META.sheet_stock[id] ? ` <small class="sheet-stock">${esc(stockOfSheet(id).name)}</small>` : ''}</h4><a download="${esc(sheet.name)}.svg">Download SVG</a>
             <p class="sheet-unavailable" hidden>Unavailable for this stock.</p>
           </article>`;
         }
@@ -94,7 +106,7 @@ module.exports = function build(GAME_DIR, argv) {
           </div>`;
         }).join('\n');
         return `<article class="sheet-block" id="sheet-${sheet.id}" aria-labelledby="sheet-${sheet.id}-title">
-          <h4 id="sheet-${sheet.id}-title">${esc(sheet.name)}</h4>
+          <h4 id="sheet-${sheet.id}-title">${esc(sheet.name)} <small class="sheet-stock">${esc(stockOfSheet(sheet.id).name)}</small></h4>
           <div class="sheet-row${sheet.back ? '' : ' single-sided'}">${cards}</div>
           <p class="sheet-description">${esc(sheet.description)}</p>
         </article>`;
@@ -160,7 +172,7 @@ module.exports = function build(GAME_DIR, argv) {
 <div class="modal" id="modal-files" hidden><div class="modal-box wide">
     <button type="button" class="close" data-close="files" aria-label="Close">×</button>
     <section id="files">
-      <h2>Laser files <small id="files-legend">300 × 450 mm sheets · kerf drawn into every cut: machine kerf compensation OFF · black engrave, yellow vector fill, blue score, orange corner marks, red cut</small></h2>
+      <h2>Laser files <small id="files-legend">@@SHEET_SIZE@@ mm sheets · kerf drawn into every cut: machine kerf compensation OFF · black engrave, yellow vector fill, blue score, orange corner marks, red cut</small></h2>
       @@STOCK@@
       <p id="sheet-status" role="status" hidden></p>
       <div class="sheets" id="sheets">@@SHEET_GROUPS@@</div>
@@ -178,6 +190,7 @@ module.exports = function build(GAME_DIR, argv) {
     for (const sheet of SHEET_GROUPS.flatMap(g => g.sheets)) if (sheet.file) SHEETS_ALL[sheet.id] = rd(sheet.file);
     const PACK = PACK_REPORT.placements;
     body = rep(body, '@@SHEET_GROUPS@@', sheet_groups(SHEETS_ALL));
+    body = rep(body, '@@SHEET_SIZE@@', `${META.sheet_w} × ${META.sheet_h}`);
     const sheetText = sheet_text_blocks(SHEETS_ALL);
     if (!Array.isArray(PACK)) throw new Error('packing.json has no placements list: rerun node engine/bin/bg.js pack');
     /* the jig shapes join the page's parts under prefixed ids so the viewer can show the jigs assembled; JIG carries the placements that stand them up */

@@ -127,3 +127,8 @@ body.modal-open { overflow:hidden; }
   .modal { padding:8px; } .modal-box { padding:18px 12px 24px; border-radius:12px; }
 }
 @media (prefers-reduced-motion:reduce) { .boxbtn.closed { animation:none; } }
+/* the laser files' raw materials list and the stock name in each sheet's header (layout only; the game's page.css colours them) */
+#files .materials { margin: 0 0 14px; }
+#files .materials h4 { margin: 0 0 4px; }
+#files .materials ul { margin: 0; padding-left: 20px; }
+#files .sheet-stock { font-weight: normal; opacity: .75; margin-left: 6px; }
