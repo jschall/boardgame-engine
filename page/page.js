@@ -143,8 +143,8 @@
   if (!ASMS['view-closed']) addAsm('view-closed', 'Views', 'The closed box', 'The lid tray sits turned over on the base. The neck holds the rims apart, leaving a shadow line, with thumb notches on two sides to push them apart. Orbit underneath for the medallion and the product code.', 'lid-cut',
     () => { const L = []; trayEx(L, 'base'); neckEx(L, 0); L.forEach(i => i.ex = [0, 0, 0]); lidOn(L); return L; }, { pitch: 62, yaw: -32, lift: true });
   if (!ASMS['view-packed']) addAsm('view-packed', 'Views', 'The box, packed for storage', 'Every piece inside the closed box, as the packing check placed it. Lift the lid to see where the pieces fit.', 'floor-base',
-    () => { const L = []; trayEx(L, 'base'); neckEx(L, 0); L.forEach(i => i.ex = [0, 0, 0]);
-      PACKING.forEach(q => { need(PARTS, q.pid, 'PARTS (a piece packing.json places)'); L.push(exFor(mk({ part: part(q.pid), x: q.x, y: q.y, z: 6 + q.z, rot: q.rot || 0 }))); });
+    () => { const L = [], D = DIM(), floorTop = D.FU + D.T3; trayEx(L, 'base'); neckEx(L, 0); L.forEach(i => i.ex = [0, 0, 0]);   /* the packer's z is above the floor's top: FLOOR_UP + the floor (0 + t for a flush floor; 6 was the raised floor's, and sank TUMBLER's neck into its pocket layer) */
+      PACKING.forEach(q => { need(PARTS, q.pid, 'PARTS (a piece packing.json places)'); L.push(exFor(mk({ part: part(q.pid), x: q.x, y: q.y, z: floorTop + q.z, rot: q.rot || 0 }))); });
       lidOn(L); return L; }, { pitch: 58, yaw: -32, lift: true });
   /* the box glue jig, standing as it is used (JIG carries each ramp's place in the assembled jig, from the generator, not from the cut sheet). A vertical
      instance runs the drawing's y DOWN from z unless flipV is set; the ramp is drawn with its body above the torsion axis and its tab below, so it wants
