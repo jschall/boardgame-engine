@@ -74,6 +74,7 @@
   /* ------------------------------------------------------------ the parts viewer's assemblies: the box (machinery) and the game's (GameTable adds them with api.addAsm) */
   const PV = { static: [], dynamic: [], home: null, current: null, k: 0 };
   let mode = 'table';
+  let viewLock = false, persistCam = false;   /* the GET string: each modal writes its place so a reload opens the same view */
   /* a standee on its base: the base flat at (x, y, z), the figure standing on it */
   function standee(list, basePid, pid, x, y, z, rot) { rot = rot || 0; list.push(mk({ part: part(basePid), x, y, z, rot }), posed(mk({ part: part(pid), back: part(pid + '-back'), vertical: true, x, y, rot }), () => ({ z: z + STOCK_T(stockOf(basePid)) }))); }
   function exFor(inst, ex) { inst.x0 = inst.x; inst.y0 = inst.y; inst.z0 = inst.z; inst.ex = ex || [0, 0, 0]; return inst; }
@@ -176,7 +177,7 @@
       const A = ASMS[id]; const pid = A ? A.rep : id; if (!PARTS[pid]) continue;
       const bb = part(pid).bbox; const sub = A ? A.build().length + ' parts' : `${Math.round(bb[2] - bb[0])} × ${Math.round(bb[3] - bb[1])} mm`;
       const bt = document.createElement('button'); bt.className = 'pitem'; bt.dataset.id = id; bt.innerHTML = `${thumb(pid)}<span><span class="pn">${A ? A.name : partName(id)}</span><span class="ps">${sub}</span></span>`;
-      bt.addEventListener('click', () => loadPart(id)); plist.appendChild(bt);
+      bt.addEventListener('click', () => { persistCam = false; loadPart(id); }); plist.appendChild(bt);
     }
   }
   }
@@ -191,11 +192,11 @@
     const pb = A ? null : part(id).bbox;
     $('pv-desc').innerHTML = A ? `<b>${A.name}</b><br>${A.desc}` : `<b>${partName(id)}</b>: ${Math.round(pb[2] - pb[0])} × ${Math.round(pb[3] - pb[1])} mm, ${need(STOCKS[stockOf(id)], 'name', 'META.stocks')}, exactly as cut.`;
     const ex = $('pv-explode'); ex.disabled = !A || !L.some(i => i.ex[0] || i.ex[1] || i.ex[2]); ex.textContent = A && A.lift ? 'Lift the lid' : 'Explode';
-    if (mode === 'parts') { scene.dynamic = PV.dynamic; scene.setView(framed(PV.home)); dirty = true; }
+    if (mode === 'parts') { scene.dynamic = PV.dynamic; scene.setView(framed(PV.home)); dirty = true; writeView(); }
   }
   function setExplode(to, instant) {
     const A = ASMS[PV.current]; const from = PV.k;
-    const apply = k => { PV.k = k; for (const i of PV.dynamic) if (i.ex) { i.x = i.x0 + i.ex[0] * k; i.y = i.y0 + i.ex[1] * k; i.z = i.z0 + i.ex[2] * k; } dirty = true; };
+    const apply = k => { PV.k = k; for (const i of PV.dynamic) if (i.ex) { i.x = i.x0 + i.ex[0] * k; i.y = i.y0 + i.ex[1] * k; i.z = i.z0 + i.ex[2] * k; } dirty = true; if (k === 0 || k === 1) writeView(); };
     $('pv-explode').textContent = A && A.lift ? (to ? 'Close the lid' : 'Lift the lid') : (to ? 'Collapse' : 'Explode');
     if (instant) apply(to); else uiTween(800, u => apply(from + (to - from) * ez(u)));
   }
@@ -235,18 +236,74 @@
     panelEl.hidden = m !== 'parts'; stageEl.classList.toggle('parts', m === 'parts');
     scene.static = Mo.static; scene.dynamic = Mo.dynamic; scene.opts.table = m === 'parts' ? '#e4d6b8' : '#3b2a1c'; scene.opts.plain = m === 'parts'; scene.opts.fog = m === 'parts' ? null : FOG; scene.setView(framed(Mo.home)); dirty = true;
   }
-  /* the nav's three modals: the rulebook and the laser files are overlays; Parts is the panel over the stage with the scene in parts mode. The game pauses behind any of them. */
+  /* the nav's three modals: the rulebook and the laser files are overlays; Parts is the panel over the stage with the scene in parts mode. The game pauses behind any of them.
+     Each open view is a GET string (location.search) so a reload lands on the same modal, page, part, explode, camera or sheet. Stock and QA stay in the hash. */
   const modalOpen = () => document.body.classList.contains('modal-open');
+  const VIEW_KEYS = ['rules', 'parts', 'files', 'x', 'p', 'y', 'v', 'cx', 'cy', 'cz'];
+  function hashPairs() { return location.hash.slice(1).split('&').filter(Boolean).map(s => { const i = s.indexOf('='); return i < 0 ? [s, ''] : [decodeURIComponent(s.slice(0, i)), decodeURIComponent(s.slice(i + 1))]; }); }
+  function writeView() {
+    if (viewLock || Object.fromEntries(hashPairs()).shot !== undefined) return;
+    const p = new URLSearchParams(location.search);
+    for (const k of VIEW_KEYS) p.delete(k);
+    const overlay = [...document.querySelectorAll('.modal')].find(m => !m.hidden);
+    const name = overlay ? overlay.id.slice(6) : (mode === 'parts' ? 'parts' : '');
+    if (name === 'rules') {
+      p.set('rules', String((window.__manual && window.__manual.page) || 1));
+    } else if (name === 'parts') {
+      p.set('parts', PV.current || '');
+      if (PV.k > 0.5) p.set('x', '1');
+      if (persistCam) {
+        const o = scene.opts;
+        p.set('p', String(Math.round(o.pitch * 10) / 10)); p.set('y', String(Math.round(o.yaw * 10) / 10)); p.set('v', String(Math.round(o.view)));
+        p.set('cx', String(Math.round(o.cx))); p.set('cy', String(Math.round(o.cy))); p.set('cz', String(Math.round(o.cz)));
+      }
+    } else if (name === 'files') {
+      p.set('files', (window.__lightbox && window.__lightbox.open && window.__lightbox.id) || '');
+    }
+    const qs = p.toString(), next = location.pathname + (qs ? '?' + qs : '') + location.hash;
+    if (next !== location.pathname + location.search + location.hash) history.replaceState(null, '', next);
+  }
+  function applyView() {
+    if (Object.fromEntries(hashPairs()).shot !== undefined) return;
+    const q = Object.fromEntries(new URLSearchParams(location.search));
+    viewLock = true;
+    try {
+      if (q.parts !== undefined) {
+        openModal('parts');
+        if (q.parts) loadPart(q.parts);
+        if (q.x === '1') setExplode(1, true);
+        if (q.p !== undefined) {
+          persistCam = true;
+          const v = {}; for (const [k, n] of [['p', 'pitch'], ['y', 'yaw'], ['v', 'view'], ['cx', 'cx'], ['cy', 'cy'], ['cz', 'cz']]) if (q[k] !== undefined) v[n] = +q[k];
+          scene.setView(v); dirty = true;
+        }
+      } else if (q.rules !== undefined) {
+        openModal('rules');
+        if (q.rules && window.__manual && window.__manual.set) window.__manual.set(+q.rules);
+      } else if (q.files !== undefined) {
+        openModal('files');
+        if (q.files && window.__lightbox && window.__lightbox.show) window.__lightbox.show(q.files);
+      }
+    } finally { viewLock = false; writeView(); }
+  }
+  window.__onManualPage = writeView;
   function openModal(name) {
-    if (name === 'parts') { if (mode !== 'parts') { paused = true; introFinish(); setMode('parts'); } return; }
-    const m = el('modal-' + name); if (!m.hidden) return; if (name === 'files') ensurePreviews(); m.hidden = false; document.body.classList.add('modal-open'); paused = true;
+    if (name === 'parts') { if (mode !== 'parts') { paused = true; introFinish(); setMode('parts'); } writeView(); return; }
+    const m = el('modal-' + name); if (!m.hidden) return;
+    if (name === 'files') {
+      if (document.readyState === 'complete') ensurePreviews();
+      else window.addEventListener('load', ensurePreviews, { once: true });
+    }
+    m.hidden = false; document.body.classList.add('modal-open'); paused = true;
     const c = m.querySelector('.close'); if (c && c.focus) c.focus({ preventScroll: true });
+    writeView();
   }
   function closeModal(name) {
-    if (name === 'parts') { if (mode === 'parts') { setMode('table'); if (demo.on) paused = false; } return; }
+    if (name === 'parts') { if (mode === 'parts') { persistCam = false; setMode('table'); if (demo.on) paused = false; writeView(); } return; }
     const m = el('modal-' + name); m.hidden = true;
     if (![...document.querySelectorAll('.modal')].some(x => !x.hidden)) document.body.classList.remove('modal-open');
     if (demo.on && mode === 'table') paused = false;
+    writeView();
   }
   document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openModal(b.dataset.open)));
   document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeModal(b.dataset.close)));
@@ -255,7 +312,7 @@
     if (e.key !== 'Escape' || (window.__lightbox && window.__lightbox.open)) return;
     const open = [...document.querySelectorAll('.modal')].find(m => !m.hidden); if (open) closeModal(open.id.slice(6)); else if (mode === 'parts') closeModal('parts');
   });
-  window.__modal = { open: openModal, close: closeModal };
+  window.__modal = { open: openModal, close: closeModal, apply: applyView };
   /* look is the reader's orbit on top of the opening's scripted camera, so a drag on the closed boxes or during the flights is not overwritten next frame */
   const LOOK = { yaw: 0, pitch: 0, cx: 0, cy: 0, cz: 0, view: 1 };
   const resetLook = () => { LOOK.yaw = LOOK.pitch = LOOK.cx = LOOK.cy = LOOK.cz = 0; LOOK.view = 1; };
@@ -273,13 +330,13 @@
       } else if (drag.btn === 2 || e.shiftKey) { const mm = sc.opts.view / sc.H; const R = sc.cam.right, U = sc.cam.up; sc.setView({ cx: drag.cx - R[0] * dx * mm + U[0] * dy * mm, cy: drag.cy - R[1] * dx * mm + U[1] * dy * mm, cz: drag.cz - R[2] * dx * mm + U[2] * dy * mm }); }
       else sc.setView({ yaw: drag.yaw - dx * 0.5, pitch: drag.pitch - dy * 0.35 });
       dirty = true; });
-    cv.addEventListener('pointerup', () => { drag = null; }); cv.addEventListener('pointercancel', () => { drag = null; });
+    cv.addEventListener('pointerup', () => { drag = null; if (mode === 'parts') { persistCam = true; writeView(); } }); cv.addEventListener('pointercancel', () => { drag = null; });
     cv.addEventListener('contextmenu', e => e.preventDefault());
     /* the wheel (and a trackpad pinch, which arrives as ctrl + wheel) zooms; during the opening it scales the scripted view */
     cv.addEventListener('wheel', e => { e.preventDefault(); if (modalOpen()) return;
       if (INTRO.live) { LOOK.view = Math.max(0.05, Math.min(8, LOOK.view * Math.exp(e.deltaY * 0.0012))); sc.setView(withLook(introCamera(INTRO.p))); }
       else sc.setView({ view: Math.max(20, Math.min(4000, sc.opts.view * Math.exp(e.deltaY * 0.0012))) });
-      dirty = true; }, { passive: false });
+      dirty = true; if (mode === 'parts') { persistCam = true; writeView(); } }, { passive: false });
   })(canvas, scene);
   window.addEventListener('resize', () => { scene.resize(); dirty = true; });
 
@@ -442,7 +499,8 @@
     const view = box.querySelector('.lb-view'), img = view.querySelector('img'), title = box.querySelector('.lb-title'), dl = box.querySelector('.lb-dl');
     const S = { k: -1, scale: 1, x: 0, y: 0, drag: null };
     const cards = () => [...el('sheets').querySelectorAll('.sheet')].filter(c => c.querySelector('a[download]').hasAttribute('href'));
-    const report = () => { window.__lightbox = { open: !box.hidden, index: S.k, name: img.alt, scale: S.scale }; };
+    const report = () => { window.__lightbox = { open: !box.hidden, index: S.k, id: S.id, name: img.alt, scale: S.scale, show: showId }; };
+    function showId(id) { const k = cards().findIndex(c => c.dataset.sheetId === id); if (k >= 0) show(k); }
     const apply = () => { img.style.transform = `translate(${S.x}px, ${S.y}px) scale(${S.scale})`; report(); };
     const fit = () => {
       const vw = view.clientWidth, vh = view.clientHeight, nw = img.naturalWidth, nh = img.naturalHeight;
@@ -456,12 +514,19 @@
       const description = box.querySelector('.lb-description');
       description.textContent = c.dataset.description || ''; description.hidden = !description.textContent;
       if (!ci || !ca) throw new Error('a sheet card without its picture or download link: rebuild with node build.js');
+      if (!ci.getAttribute('src')) {
+        const svg = sheetSVG.get(c.dataset.sheetId);
+        if (svg === undefined) throw new Error(`the page has no SVG text for the sheet ${c.dataset.sheetId}: rebuild with node build.js`);
+        drawPreview([c, c.dataset.sheetId, svg]);
+      }
       title.textContent = ci.alt; dl.href = ca.href; dl.setAttribute('download', ca.getAttribute('download')); dl.textContent = ca.textContent;
       box.hidden = false; document.body.classList.add('lb-open');
+      S.id = c.dataset.sheetId;
       img.onload = fit; img.alt = ci.alt; img.src = ci.src;
       if (img.complete && img.naturalWidth) fit(); else report();
+      writeView();
     }
-    function close() { box.hidden = true; document.body.classList.remove('lb-open'); report(); }
+    function close() { box.hidden = true; document.body.classList.remove('lb-open'); S.id = undefined; report(); writeView(); }
     el('sheets').addEventListener('click', e => { if (e.target.closest('a')) return; const c = e.target.closest('.sheet'), k = cards().indexOf(c); if (k >= 0) show(k); });
     box.querySelector('.lb-close').addEventListener('click', close);
     box.querySelector('.lb-prev').addEventListener('click', () => show(S.k - 1));
@@ -486,6 +551,7 @@
     window.addEventListener('resize', () => { if (!box.hidden) fit(); });
     report();
   })();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyView); else applyView();
 
   /* ------------------------------------------------------------ the laser-files legend, from the built stock */
   function renderLegend() {
@@ -504,7 +570,6 @@
   const PARAMS = STOCK_LIST.map(k => need(STOCKS[k], 'params', 'META.stocks.' + k));
   const STOCK_KEYS = PARAMS.flatMap(p => [need(p, 'lo', 'params'), need(p, 'hi', 'params'), need(p, 'kerf', 'params')]);
   const STOCK_RANGE = Object.fromEntries(PARAMS.flatMap(p => [[p.lo, [0.3, 10]], [p.hi, [0.3, 10]], [p.kerf, [0.001, 0.6]]]));
-  const hashPairs = () => location.hash.slice(1).split('&').filter(Boolean).map(s => { const i = s.indexOf('='); return i < 0 ? [s, ''] : [decodeURIComponent(s.slice(0, i)), decodeURIComponent(s.slice(i + 1))]; });
   const builtStock = () => { const params = need(META, 'params', 'META'); return Object.fromEntries(STOCK_KEYS.map(k => [k, need(params, k, 'META.params')])); };
   const stockKey = P => STOCK_KEYS.map(k => (+P[k]).toFixed(3)).join('|');
   const regen = { log: [], worker: null, busy: false, pending: null, id: 0, started: 0, applied: stockKey(builtStock()) };
@@ -758,12 +823,12 @@
       const a = P[i], b = P[j];
       /* stacked pieces: the one whose underside is higher is on top (a standee's tab reaches below the tile it stands in). Two standing halves
          that cross-lap at one level keep their box order, so the upper one slides down into the lower one's slot last */
-      if (over(a.bS, b.bS) && foot(a, b, true)) { if (a.bS[2] > b.bS[2] + 0.5) above[j].push(i); else if (b.bS[2] > a.bS[2] + 0.5) above[i].push(j); else throw new Error(`the opening: ${a.inst.part.pid} and ${b.inst.part.pid} lie at one level in the box`); }
+      if (over(a.bS, b.bS) && foot(a, b, true)) { if (a.bS[2] > b.bS[2] + 0.5) above[j].push(i); else if (b.bS[2] > a.bS[2] + 0.5) above[i].push(j); else if ((a.bS[3] - a.bS[0]) * (a.bS[4] - a.bS[1]) < (b.bS[3] - b.bS[0]) * (b.bS[4] - b.bS[1])) above[j].push(i); else above[i].push(j); }   /* same Z: the smaller outline is in a hole (a disc on pocket ramps), not a second stack */
       if (over(a.bE, b.bE) && foot(a, b, false)) {
         if (a.bE[2] > b.bE[2] + 0.5) under[i].push(j); else if (b.bE[2] > a.bE[2] + 0.5) under[j].push(i);
         else if (a.vertical && b.vertical) { if (above[i].includes(j)) under[j].push(i); else if (above[j].includes(i)) under[i].push(j); else if (a.inst.part.pid < b.inst.part.pid) under[j].push(i); else under[i].push(j); }
         else if (a.vertical) under[i].push(j); else if (b.vertical) under[j].push(i);   /* a standee whose tab goes right through its tile stands on it */
-        else throw new Error(`the opening: ${a.inst.part.pid} and ${b.inst.part.pid} lie at one level on the table (hit ${JSON.stringify(G3.hit())}; ${a.inst.part.pid} at ${[a.inst.x, a.inst.y, a.inst.z].map(v => v.toFixed(2)).join(', ')} rot ${a.inst.rot}; ${b.inst.part.pid} at ${[b.inst.x, b.inst.y, b.inst.z].map(v => v.toFixed(2)).join(', ')} rot ${b.inst.rot})`);
+        /* same Z on the table: a disc in a pocket is not stacked on the layer */
       }
     }
     const seq = P.map(q => q.seq);
@@ -880,7 +945,8 @@
     const keys = [...new Set(slots.map(sl => sl.pile))], members = new Map(keys.map(k => [k, slots.filter(sl => sl.pile === k).sort((a, b) => b.b[2] - a.b[2])]));
     const before = new Map(keys.map(k => [k, new Set()]));
     for (let i = 0; i < slots.length; i++) for (let j = i + 1; j < slots.length; j++) { const a = slots[i], b = slots[j]; if (a.pile === b.pile || !G3.over(a.b, b.b) || !G3.foot(a.pts, b.pts, { part: part(a.pid) }, a.S, false, a.b, { part: part(b.pid) }, b.S, false, b.b)) continue;
-      if (a.b[2] > b.b[2] + 0.5) before.get(b.pile).add(a.pile); else if (b.b[2] > a.b[2] + 0.5) before.get(a.pile).add(b.pile); else throw new Error(`the opening: ${a.pid} and ${b.pid} lie at one level in the box`); }
+      if (a.b[2] > b.b[2] + 0.5) before.get(b.pile).add(a.pile); else if (b.b[2] > a.b[2] + 0.5) before.get(a.pile).add(b.pile);
+      else { const aA = (a.b[3] - a.b[0]) * (a.b[4] - a.b[1]), bA = (b.b[3] - b.b[0]) * (b.b[4] - b.b[1]); before.get(aA < bA ? b.pile : a.pile).add(aA < bA ? a.pile : b.pile); } }   /* same Z: the smaller outline is in a hole */
     const kindOn = new Map();   /* sig -> sigs it lands on */
     const sameOn = new Map();   /* inst -> the same kind of piece it lies on (the draw stack): its landings run in one chain, one after another */
     for (let i = 0; i < insts.length; i++) for (let j = 0; j < insts.length; j++) { if (i === j) continue; const a = insts[i], b = insts[j]; if (!G3.over(a._b, b._b)) continue;
@@ -1044,13 +1110,16 @@
      uncaught errors; window.__debug() returns the state the start depends on */
   const T0 = performance.now();
   const dbg = (...a) => console.log(`[page ${((performance.now() - T0) / 1000).toFixed(1)}s]`, ...a);
-  window.__debug = () => ({ p: INTRO.p, dir: INTRO.dir, open: INTRO.open, forced: INTRO.forced, live: INTRO.live, pending: INTRO.pending, planning: !!INTRO.planner, fromTable: INTRO.fromTable, modal: modalOpen(), mode, demo: demo.on, paused, turn: G && G.turn, over: G && G.over, hash: location.hash, viewport: [innerWidth, innerHeight] });
+  window.__debug = () => ({ p: INTRO.p, dir: INTRO.dir, open: INTRO.open, forced: INTRO.forced, live: INTRO.live, pending: INTRO.pending, planning: !!INTRO.planner, fromTable: INTRO.fromTable, modal: modalOpen(), mode, demo: demo.on, paused, turn: G && G.turn, over: G && G.over, hash: location.hash, search: location.search, viewport: [innerWidth, innerHeight] });
   window.addEventListener('error', e => dbg('uncaught error:', e.message, e.filename ? `${e.filename.split('/').pop()}:${e.lineno}` : ''));
   window.addEventListener('unhandledrejection', e => dbg('unhandled rejection:', e.reason && e.reason.message || e.reason));
   function introInit(now) {
     INTRO.pending = false; INTRO.p = -1;
     const q = Object.fromEntries(hashPairs());
     if (q.shot !== undefined) { INTRO.shot = true; introFinish(); return; }   /* a harness scene: the hash decides what runs, the box never opens or closes */
+    if (mode === 'parts' || new URLSearchParams(location.search).has('parts')) {
+      INTRO.p = 1; INTRO.live = false; INTRO.open = true; INTRO.dir = 0; INTRO.planner = null; boxButton(); return;
+    }
     if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) { introFinish(); startDemo(); return; }
     if (q.intro !== undefined) INTRO.forced = clamp01(+q.intro);
     introBuild(); INTRO.live = true; INTRO.open = false; INTRO.dir = 0; scene.dynamic = T.dynamic.concat(INTRO.boxB); scene.opts.fog = FOG; stageEl.classList.add('live');
@@ -1114,7 +1183,7 @@
   }
   texReady.then(() => {
     dirty = true; requestAnimationFrame(loop);
-    const q = Object.fromEntries(location.hash.slice(1).split('&').filter(Boolean).map(s => s.split('=')));   /* test hooks: #shot=table|box|parts&id=&p=&y=&v=&cx=&cy=&anim=N&speed= */
+    const q = Object.fromEntries(hashPairs());   /* test hooks: #shot=table|box|parts&id=&p=&y=&v=&cx=&cy=&anim=N&speed= */
     if (q.shot) {
       if (q.shot === 'parts' && q.id) { setMode('parts'); loadPart(q.id); if (q.x === '1') setExplode(1, true); } else setMode(q.shot);
       const v = {}; for (const [k, n] of [['p', 'pitch'], ['y', 'yaw'], ['v', 'view'], ['cx', 'cx'], ['cy', 'cy'], ['cz', 'cz']]) if (q[k] !== undefined) v[n] = +q[k];

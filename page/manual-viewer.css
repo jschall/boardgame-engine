@@ -12,8 +12,13 @@
 #book .manual-back { transform:rotateY(180deg); border-radius:2px 0 0 2px; }
 #book .page { left:0; top:0; width:var(--leaf-w); height:var(--leaf-h); }   /* the inner page fills the trimmed leaf; print bleed and Letter margins stay off-screen */
 #book .bleed { inset:0; }
-#book .sheet::after, #book .manual-verso::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
-#book .manual-back::after { background:linear-gradient(270deg,#66472330,transparent 5%,transparent 95%,#6647230a); }
+/* the binding crease lives on the book, not on each leaf: a turning leaf is swapped for strips, and a per-page spine shade would vanish with it */
+#book::after { content:''; position:absolute; z-index:1000; top:0; left:calc(var(--leaf-w) * 0.95); width:calc(var(--leaf-w) * 0.10); height:var(--leaf-h); pointer-events:none; background:linear-gradient(90deg, transparent, #66472330 50%, transparent); }
+#book.single::after, #book.manual-cover::after { left:var(--leaf-w); width:calc(var(--leaf-w) * 0.05); background:linear-gradient(90deg, #66472330, transparent); }
+#book.single::after { left:0; }
+#book.manual-last::after { left:calc(var(--leaf-w) * 0.95); width:calc(var(--leaf-w) * 0.05); background:linear-gradient(90deg, transparent, #66472330); }
+#book .sheet::after, #book .manual-verso::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg, transparent 95%, #6647230a); }
+#book .manual-back::after { background:linear-gradient(270deg, transparent 95%, #6647230a); }
 /* the turning leaf: strips hinged one on the next (the nesting composes their turns), each showing its slice of the front and, turned over, of
    the back; a strip's shade follows the way it faces; the leaf's own drop shadow is off while it is in the air and a soft shadow lies on the
    table under it instead */

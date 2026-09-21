@@ -54,7 +54,8 @@ async function main() {
     const pg = await browser.newPage({ viewport:{ width:1400, height:1000 } });
     pg.on('pageerror', e => errors.push(String(e)));
     pg.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    pg.on('request', r => { if (!r.url().startsWith('data:') && !r.url().startsWith('blob:') && r.url() !== pathToFileURL(file).href) external.push(r.url()); });
+    const pageHref = pathToFileURL(file).href;
+    pg.on('request', r => { const u = r.url(); if (!u.startsWith('data:') && !u.startsWith('blob:') && u !== pageHref && !u.startsWith(pageHref + '?')) external.push(u); });
     /* ready: the page's own signal (the first frame, and the flight plan when there is an opening; the plan is made between frames) */
     const ready = () => pg.waitForFunction(() => window.__manual && window.__qa && window.__intro && window.__intro.ready && (window.__intro.live || window.__intro.p >= 0 || window.__qa().playing), null, { timeout:300000 });
     const frame = () => pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
@@ -236,6 +237,38 @@ async function main() {
     await shot('#modal-files .modal-box', 'files-modal.png');
     await pg.locator('#modal-files .close').click(); assert(!(await pg.locator('#modal-files').isVisible()));
     pass('Parts panel with Explode and part selection; files modal with stock regeneration');
+    /* GET string: each modal writes its place; a reload opens that same view */
+    await pg.locator('#nav [data-open="rules"]').click();
+    await pg.waitForFunction(() => window.__manual && window.__manual.single === false);
+    await pg.evaluate(() => window.__manual.set(4));
+    assert.equal(await pg.evaluate(() => window.__manual.page), 4);
+    assert.match(await pg.evaluate(() => location.search), /(?:\?|&)rules=4(?:&|$)/);
+    await pg.reload({ timeout:180000 }); await ready(); await frame();
+    assert(await pg.locator('#modal-rules').isVisible(), 'reload restores the rulebook modal');
+    assert.equal(await pg.evaluate(() => window.__manual.page), 4, 'reload restores the rulebook page');
+    await pg.keyboard.press('Escape'); assert(!(await pg.locator('#modal-rules').isVisible()));
+    assert.equal(await pg.evaluate(() => location.search), '', 'closing the rulebook clears the GET string');
+    const partId = await pg.locator('#plist .pitem').nth(1).getAttribute('data-id');
+    await pg.locator('#nav [data-open="parts"]').click();
+    await pg.locator(`#plist .pitem[data-id="${partId}"]`).click(); await frame();
+    assert.equal(await pg.evaluate(() => new URLSearchParams(location.search).get('parts')), partId);
+    await pg.reload({ timeout:180000 }); await ready(); await frame();
+    assert.equal(await pg.evaluate(() => window.__qa().mode), 'parts', 'reload restores the parts panel');
+    assert.equal(await pg.evaluate(() => document.querySelector('#plist .pitem.on') && document.querySelector('#plist .pitem.on').dataset.id), partId);
+    await pg.locator('#panel [data-close="parts"]').click();
+    const sheetId = await pg.locator('#sheets .sheet').first().getAttribute('data-sheet-id');
+    await pg.locator('#nav [data-open="files"]').click();
+    await pg.locator(`#sheets .sheet[data-sheet-id="${sheetId}"] .sheet-preview`).click();
+    assert(await pg.evaluate(() => window.__lightbox && window.__lightbox.open));
+    assert.equal(await pg.evaluate(() => new URLSearchParams(location.search).get('files')), sheetId);
+    await pg.reload({ timeout:180000 }); await ready(); await frame();
+    assert(await pg.locator('#modal-files').isVisible(), 'reload restores the files modal');
+    assert(await pg.evaluate(id => window.__lightbox && window.__lightbox.open && window.__lightbox.id === id, sheetId), 'reload restores the sheet lightbox');
+    await pg.keyboard.press('Escape');
+    assert(await pg.locator('#modal-files').isVisible());
+    assert.equal(await pg.evaluate(() => new URLSearchParams(location.search).get('files')), '');
+    await pg.locator('#modal-files .close').click();
+    pass('GET string: reload restores the rulebook page, the selected part, and the files lightbox');
     assert.deepEqual(external, [], 'Page load must not request companion assets or network resources');
     assert.deepEqual(errors, [], 'No console errors or uncaught exceptions');
     pass('No external page resources, console errors or uncaught exceptions');

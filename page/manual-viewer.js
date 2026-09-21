@@ -43,6 +43,9 @@
     });
     reader.classList.remove('dragging');
     book.style.setProperty('--book-shift', single ? '0px' : `${(cursor === 0 ? -1 : cursor === last() ? 1 : 0) * stage.clientWidth / 4}px`);
+    book.classList.toggle('manual-cover', !single && cursor === 0);
+    book.classList.toggle('manual-last', !single && cursor === last());
+    if (typeof window.__onManualPage === 'function') window.__onManualPage(pageNumber());
   }
   function fit() {
     const scale = Math.min(1, (stage.clientWidth - 16) / book.offsetWidth);
@@ -99,7 +102,9 @@
       x += m.w * Math.cos(rad);
     });
     const g = m.ground, lift = Math.sin(-theta * Math.PI / 180);
-    g.style.left = `${Math.min(0, x).toFixed(2)}mm`; g.style.width = `${Math.max(6, Math.abs(x)).toFixed(2)}mm`;
+    const span = Math.max(6, Math.abs(x));   /* keep the dark edge on the spine when the projection is thinner than the blur */
+    g.style.left = `${(x < 0 ? -span : 0).toFixed(2)}mm`;
+    g.style.width = `${span.toFixed(2)}mm`;
     g.style.opacity = (0.42 * Math.pow(lift, 0.7)).toFixed(3);
     g.classList.toggle('left', x < 0);
   }
@@ -112,6 +117,7 @@
     const i = direction > 0 ? cursor : cursor - 1, leaf = leaves[i];
     motion = Object.assign({ leaf, direction, progress:0, to: cursor + direction }, buildCurl(leaf));
     book.style.setProperty('--book-shift', '0px');
+    book.classList.remove('manual-cover', 'manual-last');   /* the crease shades both sides of the binding while a leaf is in the air */
     for (const j of [cursor - 2, cursor - 1, cursor, cursor + 1]) if (leaves[j]) leaves[j].style.visibility = 'visible';
     leaf.style.visibility = 'hidden';
     motion.curl.style.zIndex = String(count + 2); book.append(motion.curl);
@@ -189,5 +195,5 @@
   }).observe(stage);
   layout(1);
   /* ### SCAFFOLD: observable state for the page gate and animation inspection. */
-  window.__manual = { get page() { return pageNumber(); }, get single() { return single; }, get turning() { return !!motion; }, get progress() { return motion ? motion.progress : 0; }, get count() { return count; }, get strips() { return motion ? motion.strips.length : 0; }, go, turn };
+  window.__manual = { get page() { return pageNumber(); }, get single() { return single; }, get turning() { return !!motion; }, get progress() { return motion ? motion.progress : 0; }, get count() { return count; }, get strips() { return motion ? motion.strips.length : 0; }, go, turn, set: n => layout(n) };
 })();

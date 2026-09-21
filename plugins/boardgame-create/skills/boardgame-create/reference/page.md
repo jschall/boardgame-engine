@@ -58,6 +58,8 @@ The owner's standard: "plain sentences instead of slogan fragments", and a revie
 
 The files modal takes two caliper readings and a kerf per stock (`#t3lo=2.67&t3hi=2.92&kerf_t3=0.18`, keys from the game's stocks). A worker in the page regenerates the parts, the 3D view and the SVG downloads from the same generator `bg parts` runs. Defaults come from `game.json` / the built `META.params`. The typefaces in that generator are the game's `fonts/` (`game.json.fonts`), not a face the engine picked.
 
+Each modal writes a GET string (`location.search`) so a reload opens the same view: `?rules=4` the rulebook at that page, `?parts=<id>&x=1` the parts panel (optional explode; `p` `y` `v` `cx` `cy` `cz` after the reader orbits), `?files` the laser files and `?files=<sheet>` the lightbox on that sheet. Closing the modal clears it. Stock and the QA `#shot=` hooks stay in the hash.
+
 ## Test hooks the QA scripts rely on (keep them)
 
 | hook | purpose |
@@ -68,7 +70,7 @@ The files modal takes two caliper readings and a kerf per stock (`#t3lo=2.67&t3h
 | `window.__intro.openBox()` / `closeBox()` / `rate` | the box button's two actions, and a pace multiplier for the harnesses (`rate = 4` opens in a quarter of the time) |
 | `window.__intro` | `{p, target, live, end, pieces, set(p), finish()}`: the opening's state; `finish()` restores the table pose; `window.__introDebug` summarises the flight plan |
 | `window.__qa().playing` | the demo is running (it starts by itself when the box is open) |
-| `window.__modal.open(name)` | 'rules', 'parts' or 'files', as the nav buttons do |
+| `window.__modal.open(name)` | 'rules', 'parts' or 'files', as the nav buttons do; each writes a GET string (`?rules=4`, `?parts=<id>`, `?files=<sheet>`) so a reload restores that view |
 | `#shot=box&lift=1` | the lid lifted |
 | `#shot=table&anim=N&speed=S` | start the animation at speed S and pause after N turns |
 | `window.__scene` | the live scene (`static`, `dynamic`, `basis`, `world`) for the in-page intersection check |
