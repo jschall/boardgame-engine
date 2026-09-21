@@ -560,7 +560,7 @@
     const KF = need(META, 'kerfs', 'META'), kv = STOCK_LIST.map(k => need(KF, k, 'META.kerfs')), kerf = kv.every(v => v === kv[0]) ? `${n(kv[0])} mm` : STOCK_LIST.map(k => `${n(KF[k])} mm (${STOCKS[k].name})`).join(', ');
     const edgeS = !!(META.edge_scores && META.edge_score_mm);
     const legend = el('files-legend');
-    const vf = META.vector_fill && META.vector_fill.elements ? `, yellow vector fill (concentric lines ${META.vector_fill.lines_per_cm} to the centimetre: run at engraving power with the engraving, ${META.vector_fill.elements} low-density elements)` : '';
+    const vf = META.vector_fill && META.vector_fill.elements ? `, yellow vector fill (a spiral of lines ${META.vector_fill.lines_per_cm} to the centimetre: run at engraving power with the engraving, ${META.vector_fill.elements} low-density elements)` : '';
     legend.textContent = `${META.sheet_w} × ${META.sheet_h} mm sheets · kerf ${kerf} drawn into every cut: machine kerf compensation OFF · black engrave${vf}, blue score${edgeS ? ' (low power, after engraving, before cutting)' : ''}, orange corner marks on the backs files, red cut`;
   }
   renderLegend();
