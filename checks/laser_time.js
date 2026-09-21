@@ -5,7 +5,7 @@
    parts/parts.json (meta.vector_fill, written by the layout's plan_vector_fill) and prints, per sheet, the raster seconds under the sweep-and-merge
    model before and after the conversions, the vector seconds added, and each element decided on (converted or rejected, with the raster rows
    it forced on its own, the whole-sheet saving its conversion gives, and its vector cost). The model is the owner's xTool S1 at 100 lines per
-   inch; compare the totals with the machine software's own estimate and correct the model (game.json vector_fill, or the layout's vector_fill
+   centimetre; with the fill off (the default) there is nothing to report and the tool says so; compare the totals with the machine software's own estimate and correct the model (game.json vector_fill, or the layout's vector_fill
    option) when they drift.
      node engine/bin/bg.js lasertime [--all]          (from the game folder; --all lists every decided element, not only the converted ones) */
 'use strict';
