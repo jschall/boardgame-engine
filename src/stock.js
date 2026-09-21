@@ -43,12 +43,12 @@
     crosslap_below: 1.0,   // a bottom cross-lap slot runs to t_tile + this below the base line
     centre_band: 0.8,      // engraving keeps t / 2 + this from a standee's centre line (the crossing half hides it)
     tab_proud: 0.08,       // floor tab length = t + this: the tab reaches the wall's outer face
-    finger: 0.08,          // wall finger length = t + this; the tray's outside is INNER + 2 (t + finger)
-    band_notch: 0.10,      // a finger band stops this short of each internal band edge (walls and neck boards)
-    core_relief: 0.15,     // the walls with thumb notches have their core ends cut back this much in the bands the other walls' fingers fill
+    finger: 0,             // wall finger length = t (thickest reading); flush with the outer face. Was 0.08 proud.
+    band_notch: 0,         // finger bands meet at the band line (no gap, no overlap). Was 0.10: A shrank and B grew at the seam; neck boards both shrank and left a 0.20 mm gap
+    core_relief: 0,        // B-wall cores meet A's fingers at the inner face. Was 0.15: a designed gap in the bands A's fingers fill
     neck_cl: 0.30,         // neck ring body outside = INNER + 2 finger - 2 neck_cl
-    base_ease: 0.10,       // the base tray is drawn INNER + 2 base_ease inside (owner 2026-09-17: the neck goes in a little easier)
-    lid_ease: 0.50,        // the lid tray is drawn INNER + 2 lid_ease inside (owner 2026-09-17: the lid slides over the neck with room)
+    base_ease: 0.10,       // base tray is drawn INNER + 2 ease inside (neck goes in a little easier than a zero-ease frame)
+    lid_ease: 0.05,        // lid over the neck grip: half of 0.10. Was 0.50 then 0.10; owner 2026-09-21: reduce neck-lid clearance by half
     neck_finger_under: 0.07,   // neck finger length = t_min - this: no finger stands past the board it meets
     well: 0.60,            // a drop-in well = the token + this across flats (0.30 a side, the pocket clearance)
     min_width: 2.0, min_projection: 1.0,   // no load-bearing feature narrower or shorter than this: the beam cannot reproduce ribs
@@ -83,7 +83,7 @@
     /* the drawn frame: box.inner is one number (a square) or [x, y] (a rectangle: x is the S and N walls' span, y the E and W walls'); INNER stays the
        x span for everything square-minded, INNER_X / INNER_Y carry the rectangle (TUMBLER: a 270 x 360 board is the base floor, owner 2026-09-18) */
     const [INNER_X, INNER_Y] = Array.isArray(box.inner) ? box.inner : [box.inner, box.inner], INNER = INNER_X;
-    for (const v of [INNER_X, INNER_Y]) if (!(v >= 80 && v <= 400)) throw new Error(`box.inner must be 80 to 400 mm a side, got ${JSON.stringify(box.inner)}`);
+    for (const v of [INNER_X, INNER_Y]) if (!(v >= 60 && v <= 400)) throw new Error(`box.inner must be 60 to 400 mm a side, got ${JSON.stringify(box.inner)}`);
     const WALL_H = box.wall_h || D.WALL_H;
     if (!(WALL_H >= 12 && WALL_H <= 40)) throw new Error(`box.wall_h must be 12 to 40 mm, got ${WALL_H}`);
     /* the floor: 'raised' (the default: FLOOR_UP above the wall's bottom edge, its tabs through slots in the walls) or 'flush' (on the bottom edge,
@@ -91,6 +91,7 @@
     const FLOOR = box.floor || 'raised'; if (!['raised', 'flush'].includes(FLOOR)) throw new Error(`box.floor is 'raised' or 'flush', got ${FLOOR}`);
     const FLOOR_UP = FLOOR === 'flush' ? 0 : D.FLOOR_UP;
     const GAP = box.gap || D.GAP; if (!(GAP >= 1.5 && GAP <= 6)) throw new Error(`box.gap (the shadow line) must be 1.5 to 6 mm, got ${GAP}`);
+    const BASE_EASE = FIT.base_ease, LID_EASE = FIT.lid_ease;
     const WALL_T = B.t + FIT.finger, OUT_X = INNER_X + 2 * WALL_T, OUT_Y = INNER_Y + 2 * WALL_T, OUT = OUT_X;
     /* the neck stands on the base floor, or NECK_ON above it (TUMBLER: on the board's pocket layer, which fills the floor under the neck) */
     const NECK_ON = typeof box.neck_on === 'string' ? (S[box.neck_on] ? S[box.neck_on].t : NaN) : (box.neck_on || 0);   /* a number, or a stock key: that stock's built thickness (the layer it stands on) */
@@ -101,22 +102,29 @@
        carries that art turned half a turn and stands at the opposite position of its pair in the open tray */
     const LID_HINGE = box.lid_hinge || 'y'; if (!['x', 'y'].includes(LID_HINGE)) throw new Error(`box.lid_hinge must be 'x' or 'y', got ${box.lid_hinge}`);
     const WALL_SLOT_H = B.t + FIT.slot;
-    /* the corner fingers: three bands a wall (the outer two to the S and N walls) while a band is 6 mm or more, else two (the rim band to the S and
-       N walls: one chunky finger each, as TUMBLER's 12.5 mm walls were drawn); the neck likewise five bands or three */
-    const N_BANDS = WALL_H / 3 >= 6 ? 3 : 2, NECK_BANDS = NECK_H / 5 >= 6 ? 5 : 3;
+    /* three finger bands a wall so the joints sit at both edges (open rim and floor): A owns the outer two, B the middle. Two-band (a solid rim
+       on one edge) only if a third band would fall below the load-bearing minimum. The neck is five bands, or three if those would be under 6 mm. */
+    const N_BANDS = WALL_H / 3 >= FIT.min_width ? 3 : 2, NECK_BANDS = NECK_H / 5 >= 6 ? 5 : 3;
     for (const [name, width, projection] of [
       ['floor tab', D.TAB_W, B.t + FIT.tab_proud], ['corner finger', WALL_H / N_BANDS - 2 * FIT.band_notch, B.t + FIT.finger],
       ['neck finger', NECK_H / NECK_BANDS - 2 * FIT.band_notch, N.tlo - FIT.neck_finger_under]])
       if (width < FIT.min_width || projection < FIT.min_projection) throw new Error(`${name}: ${width} x ${projection} mm is below the load-bearing minimum`);
-    /** the number and centres of the floor tabs along a side of the box: 60 mm apart, centred */
-    const tabs_along = L => { const n = Math.max(2, Math.min(4, Math.floor(L / 60))); return Array.from({ length: n }, (_, i) => L / 2 + (i - (n - 1) / 2) * 60); };
+    /** the number and centres of the floor tabs along a side of the box: 60 mm apart, centred. On a short side the pitch shrinks so each tab
+        stays on the inner span (TAB_W/2 plus 2 mm of wood to the corner); 100 mm and up keep the 60 mm pitch. */
+    const tabs_along = L => {
+      const n = Math.max(2, Math.min(4, Math.floor(L / 60))), half = D.TAB_W / 2, minEnd = half + 2;
+      let pitch = 60;
+      if (L / 2 - (n - 1) / 2 * pitch < minEnd) pitch = (L - 2 * minEnd) / (n - 1);
+      if (!(pitch > D.TAB_W)) throw new Error(`box.inner ${L} mm cannot take ${n} floor tabs of ${D.TAB_W} mm`);
+      return Array.from({ length: n }, (_, i) => L / 2 + (i - (n - 1) / 2) * pitch);
+    };
     const TABS_X = tabs_along(INNER_X), TABS_Y = tabs_along(INNER_Y), TABS = TABS_X;
     const F = {
       stocks: S, box_stock: box.stock, neck_stock: neckKey,
       INNER, INNER0: INNER, INNER_X, INNER_Y, INNER0_X: INNER_X, INNER0_Y: INNER_Y, SQUARE: INNER_X === INNER_Y, OUT, OUT_X, OUT_Y, WALL_H, WALL_T, FLOOR, FLOOR_UP, GAP, TAB_W: D.TAB_W, TABS, TABS_X, TABS_Y, N_BANDS, BAND: WALL_H / N_BANDS,
       T: B.t, T_LO: B.tlo, KERF: B.kerf,
       FLOOR_TAB: B.t + FIT.tab_proud, FLOOR_EDGE: FIT.finger, FLOOR_SPAN: INNER + 2 * FIT.finger, FLOOR_SPAN_X: INNER_X + 2 * FIT.finger, FLOOR_SPAN_Y: INNER_Y + 2 * FIT.finger,
-      EASE: 0, TRAY: null, BASE_EASE: FIT.base_ease, LID_EASE: FIT.lid_ease, BAND_NOTCH: FIT.band_notch, CORE_RELIEF: FIT.core_relief,
+      EASE: 0, TRAY: null, BASE_EASE, LID_EASE, BAND_NOTCH: FIT.band_notch, CORE_RELIEF: FIT.core_relief,
       SLOT_W: D.TAB_W, WALL_SLOT_H, SLOT_Y0: WALL_H - FLOOR_UP - WALL_SLOT_H,
       LID_HINGE, NECK_H, NECK_ON, NECK_BANDS, NECK_BAND: NECK_H / NECK_BANDS, NECK_SPLIT: box.neck_split || 0,   /* neck boards longer than this are cut as two halves meeting at a plain seam (a long box on a short sheet) */ NECK_T: N.t, NECK_FINGER: N.tlo - FIT.neck_finger_under, NECK_CL: FIT.neck_cl, NECK_OUT: INNER + 2 * FIT.finger - 2 * FIT.neck_cl,
       NECK_OUT_X: INNER_X + 2 * FIT.finger - 2 * FIT.neck_cl, NECK_OUT_Y: INNER_Y + 2 * FIT.finger - 2 * FIT.neck_cl,
@@ -131,7 +139,7 @@
     };
     return Object.freeze(F);
   }
-  /** the fits F seen from one tray: the base tray is base_ease roomier than the drawn frame on every side, the lid tray lid_ease */
+  /** the fits F seen from one tray: each tray is that tray's ease roomier than the drawn frame on every side */
   function tray(F, which) {
     if (which !== 'base' && which !== 'lid') throw new Error(`tray: 'base' or 'lid', not ${which}`);
     const e = which === 'base' ? F.BASE_EASE : F.LID_EASE;

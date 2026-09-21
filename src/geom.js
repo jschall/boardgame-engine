@@ -20,7 +20,7 @@
     if (!spec || typeof spec !== 'object') throw new Error('parts.js must export a function returning the parts spec');
     if (!spec.stocks || !Object.keys(spec.stocks).length) throw new Error('the spec has no stocks');
     if (!spec.box || !spec.box.stock) throw new Error('the spec has no box { stock, ... }');
-    if (!Array.isArray(spec.parts) || !spec.parts.length) throw new Error('the spec has no parts');
+    if (!Array.isArray(spec.parts)) throw new Error('the spec has no parts array (empty is a box-only game)');
     const ids = new Set(), out = [];
     for (const p of spec.parts) {
       if (!p.id || !/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(p.id)) throw new Error(`part id ${JSON.stringify(p.id)}: lower-case words joined by hyphens`);
@@ -297,7 +297,7 @@
            opens sheets with ctx.sheet(stock) or ctx.sheet(stock, name) and places every needed part with lay.put / lay.put_box / lay.nest; the engine
            adds the box's art overlays, the titles, the backs and the checks as for its own nesting */
         if (typeof spec.sheets === 'function') {
-          const test_sheet = (name, s, what) => { const S = F.stocks[s]; lay.sheet(name, `${name} · ${S.name} · ${what}`, S.mat, S.t, { two_sided: false, kerf: S.kerf });   /* the layout prefixes the game name */ coupon_sheets[name] = { stock: s, what }; return name; };
+          const test_sheet = (name, s, what) => { const S = F.stocks[s]; lay.sheet(name, `${name} · ${S.name} · ${what}`, S.mat, S.t, { two_sided: false, test: true, reference: false, kerf: S.kerf }); coupon_sheets[name] = { stock: s, what }; return name; };
           const add_test = (pid, s, cut, eng, o) => { setStock(pid, s); lay.add(pid, cut, eng === undefined ? EMPTY : eng, Object.assign({ kerf: F.stocks[s].kerf }, o || {})); };   /* a test piece of stock s, for a test sheet */
           spec.sheets(lay, { F, stocks: F.stocks, kerfs: Object.fromEntries(stock_keys.map(k => [k, F.stocks[k].kerf])), usable, TOP, SHEET_W, SHEET_H, need: need(), outlines: lay.outlines, stock_of: pid => stock_of[pid], sheet: open_sheet, test_sheet, add_test, sheets, score_lines: K.score_lines });
           const counts = need(), placed = {};

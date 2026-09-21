@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0; Copyright (C) 2026 Jonathan Challinger; source: https://github.com/jschall/boardgame-engine
    This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-/* boardgame-create engine: the shoulder box. Two trays cut from one INNER frame (the lid 0.50 mm a side roomier than the base's 0.10), floors
-   with finger tabs on every edge, walls with three-band finger corners and thumb notches, a symmetric neck of four boards, and the panel art:
+/* boardgame-create engine: the shoulder box. Two trays cut from one INNER frame (base 0.10 mm a side roomier, lid 0.05 mm — the lid's sliding
+   fit over the neck grip), floors with finger tabs on every edge, walls with three-band finger corners and thumb notches, a symmetric neck of
+   four boards, and the panel art:
    the lid top (frame, medallion holding the game's cover art, title ribbon, choking warning), the lid inside (the rules panel typeset from
    rules.js), the base underside (medallion, product code) and the base inside (the setup map). The shapes come from BUMBLE & BLOOM, validated on
    cut wood. Node (module.exports) or browser (BGEngine.box). */
@@ -50,7 +51,7 @@
     const mid = three ? [BAND, 2 * BAND] : (rim_top ? [BAND, 2 * BAND] : [0, BAND]);   /* B's band: the middle one, or the one away from the rim */
     const core = r > 0 ? unary_union([sbox(t, mid[0], O - t, mid[1]), sbox(t + r, 0, O - t - r, H)]) : sbox(t, 0, O - t, H);
     const owned = kind === 'A' ? (three ? [[0, BAND], [2 * BAND, 3 * BAND]] : [rim_top ? [0, BAND] : [BAND, 2 * BAND]]) : [mid];
-    const bandInset = kind === 'B' ? -F.BAND_NOTCH : F.BAND_NOTCH;   // B fills A's notched opening across the complete finger end
+    const bandInset = kind === 'B' ? -F.BAND_NOTCH : F.BAND_NOTCH;   // 0: A and B meet at the band line. If BAND_NOTCH > 0, B fills A's notched opening
     let g = unary_union([core].concat(owned.map(([a, b]) => { const [p, q] = notched_band(a, b, H, bandInset); return sbox(0, p, O, q); })));
     const y0 = rim_top ? F.SLOT_Y0 : H - F.SLOT_Y0 - F.WALL_SLOT_H;
     g = g.difference(slot_boxes(y0, F, kind));

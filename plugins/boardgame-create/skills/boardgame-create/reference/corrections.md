@@ -356,3 +356,11 @@ Every entry is a message in which the owner corrected, rejected or redirected th
 - [2026-09-18] **the walnut** — "the walnut i have is more desaturated in color than the walnut you are rendering. it also engraves dark instead of light. cut edges should render as a burnt dark brown." then "you made the engraved walnut way too dark. the engraved walnut is slighty more red, a little bit darker, more specular, and does have grain. this does not apply to the edges, don't change the edges." → Match the cut wood, not a memory of walnut; an engraving on walnut is a tinted, glossy grain, not a flat mark (I4).
 - [2026-09-18] **shadows from below** — "shadows on the table shouldn't be rendered when looking at the spread from underneath." → Contact shadows lie on the table and go with it (I4).
 - [2026-09-18] **cross-lap tabs** — "the tabs on the cross-slot standees need to be wider." and, to the engine session, a 12 mm minimum slot → 16 mm tabs, 12 mm slots measured along the walls (B6).
+
+## Added 2026-09-19
+
+- [2026-09-19] **modal GET strings** — "all modals should have a get string so that a page reload brings you back to that view. the more granular the better." → `?rules=4`, `?parts=<id>` (explode `x=1`, camera after orbit), `?files` and `?files=<sheet>` for the lightbox. Stock and `#shot=` stay in the hash.
+
+## Added 2026-09-21, BOX 60 shoulder-box fit
+
+- [2026-09-21] **reduce neck-lid clearance by half** — "reduce neck-lid clearance by half." → Engine `FIT.lid_ease` 0.10 → 0.05 mm a side (grip-to-lid). `base_ease` stays 0.10. Default for every project, not a per-game override.

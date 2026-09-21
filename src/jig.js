@@ -106,7 +106,8 @@ function parameters(tray) {
   return {barWidth:14,barLength:15,armWidth:9,armHalf:14,pivot:20,gap:2,rootRadius:1,
     theta:0.003,padInset:1,padLow:Math.min(20,tray.height-4),padHigh:Math.min(22,tray.height-2),rampRun:1.5,rampRise:6,
     G:[150,220],nominalG:185,E:3000,friction:0.30,rootFactor:1.4,
-    shearLimit:material.shearLimit,bendingLimit:material.bendingLimit,material,tabLength:8,slotClearance:0.15,tabDepth:2.25,
+    shearLimit:material.shearLimit,bendingLimit:material.bendingLimit,material,tabLength:8,slotClearance:0.15,
+    tabDepth:Math.min(2.25, tray.stock[0]-0.3),   /* 2.25 mm on 3 mm ply; on 1.5 mm stock the tab must stay inside the arm's thickness */
     sheet:[300,450],minFeature:MIN_LOAD_BEARING_WIDTH};   /* one nominal sheet, 3 mm margins: a box up to 205 mm inside fits */
 }
 // Rotate (outward distance, height) about the torsion axis. Positive opens pad.
