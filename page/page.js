@@ -942,11 +942,12 @@
        piece"): a laminated tray's pocket layer on its back (META.trays), and the pairs the game's table names in GT.glued ([carrier pid, mate pid]:
        BUMBLE's comb frames on their backings). The mate lies on its carrier in the box and on the table; it leaves the planning, the carrier is
        planned at their joint thickness, and the mate follows the carrier's flight at its fixed offset, turning with it. */
-    const GLUED = new Map();
-    for (const [tid, tr] of Object.entries(META.trays || {})) if (tr.frame && PARTS[tid + '-frame']) GLUED.set(tid + '-frame', tid);
-    for (const [c, m] of (GT.glued || [])) GLUED.set(m, c);
+    const GLUED = new Map();   /* mate pid -> the carrier pids it may lie on (one tile kind rides on any of four trays: TUMBLER's ability tiles, 2026-09-22) */
+    const glue = (m, c) => { if (!GLUED.has(m)) GLUED.set(m, new Set()); GLUED.get(m).add(c); };
+    for (const [tid, tr] of Object.entries(META.trays || {})) if (tr.frame && PARTS[tid + '-frame']) glue(tid + '-frame', tid);
+    for (const [c, m] of (GT.glued || [])) glue(m, c);
     const onTop = (m, c, ct) => Math.abs(m.x - c.x) < 0.05 && Math.abs(m.y - c.y) < 0.05 && Math.abs(((((m.rot || 0) - (c.rot || 0)) % 360) + 360) % 360) < 0.01 && Math.abs(m.z - (c.z + ct)) < 0.35;
-    for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => o.pid === GLUED.get(sl.pid) && o.pile === sl.pile && onTop(sl, o, o.thick)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${GLUED.get(sl.pid)} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
+    for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => GLUED.get(sl.pid).has(o.pid) && o.pile === sl.pile && onTop(sl, o, o.thick)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${[...GLUED.get(sl.pid)].join(' or ')} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
     slots = slots.filter(sl => !GLUED.has(sl.pid));
     for (const sl of slots) sl.fat = sl.thick + (sl.mates || []).reduce((a, m) => a + m.thick, 0);
     const G3 = geomOf();
@@ -1034,6 +1035,7 @@
     const stays = q => Math.hypot(q.PE[0] - q.PS[0], q.PE[1] - q.PS[1], q.PE[2] - q.PS[2]) < 0.6 && Math.abs(q.angle) < 0.5;
     const movers = [];
     for (const q of pieces) { if (!stays(q)) { movers.push(q); continue; } q.PS = q.PE.slice(); q.S = q.E; q.angle = 0; for (const m of q.mates) { m.PS = m.PE.slice(); m.S = m.E; } }   /* its packed pose is its table pose, to the last digit */
+    window.__introMovers = movers.map(q => ({ pid: q.inst.part.pid, from: q.PS.map(v => +v.toFixed(1)), to: q.PE.map(v => +v.toFixed(1)), angle: +q.angle.toFixed(1) }));   /* the QA hook: which pieces fly and from where (2026-09-22: 'can the dials and tokens all be in place when the box opens') */
     IB.pieces = pieces; IB.end = null; IB.fromTable = INTRO.resumeFrom >= 0; IB.planner = schedule(movers);
     for (const q of pieces) { q.t0 = q.tL = IB.fromTable || stays(q) ? -1 : 2; q.H = 0; q.delay = 0; q.lift = 0; }
     /* the second box: built one box height further from the viewer and tipped the other way about its far edge, it stands beside the first,
