@@ -168,9 +168,15 @@ async function main() {
     const pageIs = async n => { await idle(); assert.equal(await pg.evaluate(() => window.__manual.page), n); };
     const clickPage = async (id, fx = .5) => { const r = await pg.locator(id).boundingBox(); await pg.mouse.click(r.x + r.width * fx, r.y + r.height * .5); };
     await clickPage('#p1');   /* a click on the right page turns forward */
-    await pg.waitForFunction(() => window.__manual.progress > .15 && window.__manual.progress < .95);
-    assert(await pg.evaluate(() => window.__manual.strips >= 5 && [...document.querySelectorAll('#book .manual-strip')].every(e => getComputedStyle(e).transform.startsWith('matrix3d('))), 'the turning leaf is drawn as hinged strips in 3D');
-    assert(await pg.locator('#book .manual-ground').evaluate(e => +getComputedStyle(e).opacity > 0), 'the turning leaf throws a shadow on the table');
+    /* the leaf is in the air for about 900 ms: read the strips and the shadow in one evaluate at mid-turn, so a second round trip cannot land after the curl is gone (2026-09-22: a four-page book turned before a separate locator found the ground) */
+    const inAir = await pg.waitForFunction(() => {
+      const p = window.__manual.progress; if (!(p > .2 && p < .8)) return null;
+      const strips = [...document.querySelectorAll('#book .manual-strip')], ground = document.querySelector('#book .manual-ground');
+      return { strips: window.__manual.strips, hinged: strips.length > 0 && strips.every(e => getComputedStyle(e).transform.startsWith('matrix3d(')), shadow: ground ? +getComputedStyle(ground).opacity : -1 };
+    }, null, { polling: 'raf' });
+    const turning = await inAir.jsonValue();
+    assert(turning.strips >= 5 && turning.hinged, 'the turning leaf is drawn as hinged strips in 3D');
+    assert(turning.shadow > 0, 'the turning leaf throws a shadow on the table');
     await pg.screenshot({ path:path.join(shots, 'manual-turn.png'), animations:'allow' });
     await pageIs(2);
     assert.equal(await pg.locator('#book .manual-curl').count(), 0, 'the strips are gone once the leaf has landed');
