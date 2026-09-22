@@ -19,6 +19,8 @@ async function main(GAME_DIR){
  const paper=await pg.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--paper').trim());
  if(!/^#[0-9a-f]{6}$/i.test(paper))throw Error('Expected a six-digit paper colour');
  const paperRgb=paper.slice(1).match(/../g).map(v=>parseInt(v,16)/255);
+ /* the printed panel inside a sheet, as fractions of it: the Letter booklet trims each page to this and butts the two panels at the fold */
+ const panel=await pg.evaluate(()=>{const sh=document.querySelector('.sheet'),pe=sh.querySelector('.page');if(!pe)return null;const a=sh.getBoundingClientRect(),b=pe.getBoundingClientRect();return {l:(b.left-a.left)/a.width,t:(b.top-a.top)/a.height,w:b.width/a.width,h:b.height/a.height};});
  fs.writeFileSync(path.join(ROOT,'qa/layout.json'),JSON.stringify(audit,null,2));
  await pg.pdf({path:path.join(ROOT,'tmp/pdfs/chromium.pdf'),printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false});
  const N=audit.pageCount;if(!(Number.isInteger(N)&&N>=4&&N%4===0))throw Error(`the manual lays out ${N} pages; the booklet needs a multiple of four`);
@@ -34,10 +36,17 @@ async function main(GAME_DIR){
   press.setTitle(`${TITLE} · Rules · US Letter edition`);press.setSubject(`${N} pages; US Letter`);press.setCreator('HTML/CSS via Playwright Chromium; PDF boxes and imposition via pdf-lib');
   await fs.promises.writeFile(path.join(ROOT,`output/${SLUG}-print.pdf`),await press.save());
   const booklet=await PDFDocument.create(),src=await PDFDocument.load(raw),order=[];
-  for(let i=0;i<N/4;i++)for(const pair of [[N-2*i,1+2*i],[2+2*i,N-1-2*i]]){order.push(pair);const pg=booklet.addPage([1224,792]);for(let j=0;j<2;j++){const e=await booklet.embedPage(src.getPage(pair[j]-1));pg.drawPage(e,{x:j*612,y:0,width:612,height:792});}}
+  /* each page is trimmed to its printed panel and the two panels meet at the fold, so a spread reads as one sheet and the margin they gave
+     up goes to the outer edges (owner, 2026-09-22: "the booklet shouldn't have a margin in the middle between the 2 pages") */
+  if(!panel)throw Error('the manual lays out no .page inside a .sheet: the Letter booklet cannot find the printed panel');
+  const pw=panel.w*612,ph=panel.h*792,px=(1224-2*pw)/2,py=(792-ph)/2;
+  const clip={left:panel.l*612,bottom:792-(panel.t+panel.h)*792,right:(panel.l+panel.w)*612,top:792-panel.t*792};
+  for(let i=0;i<N/4;i++)for(const pair of [[N-2*i,1+2*i],[2+2*i,N-1-2*i]]){order.push(pair);const bp=booklet.addPage([1224,792]);
+   bp.drawRectangle({x:0,y:0,width:1224,height:792,color:rgb(...paperRgb)});
+   for(let j=0;j<2;j++){const e=await booklet.embedPage(src.getPage(pair[j]-1),clip);bp.drawPage(e,{x:px+j*pw,y:py,width:pw,height:ph});}}
   booklet.setTitle(`${TITLE} · Tabloid booklet · duplex short-edge`);booklet.setSubject(`Print at actual size on 11 x 17 in landscape, duplex short-edge, fold and staple: ${N/4} sheets, a US Letter booklet.`);
   await fs.promises.writeFile(path.join(ROOT,`output/${SLUG}-letter-booklet.pdf`),await booklet.save());
-  fs.writeFileSync(path.join(ROOT,'qa/imposition.json'),JSON.stringify({sheet:'Tabloid landscape',duplex:'short-edge',printScale:'100%',finishedSizeMm:[215.9,279.4],bleedMm:0,paperColor:paper,sheets:order},null,2));
+  fs.writeFileSync(path.join(ROOT,'qa/imposition.json'),JSON.stringify({sheet:'Tabloid landscape',duplex:'short-edge',printScale:'100%',finishedSizeMm:[215.9,279.4],bleedMm:0,paperColor:paper,trimmedToPanel:true,panelMm:[+(panel.w*215.9).toFixed(1),+(panel.h*279.4).toFixed(1)],sheets:order},null,2));
   console.log(JSON.stringify(audit,null,2));console.log('Built the US Letter press PDF and the Tabloid booklet.');
   const rows=Object.entries(audit).filter(([k,v])=>/Rows$/.test(k)&&Array.isArray(v)).flatMap(([,v])=>v);
   if(audit.missingImages.length||audit.overflow.length||audit.orphanCaptions.length||audit.orphanParagraphs.length||rows.some(row=>row.bottomDifferenceMm>.01))throw Error('the manual layout audit failed (manual/qa/layout.json)');
