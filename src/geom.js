@@ -47,6 +47,8 @@
       } else if (!p.shape || (!p.shape.geom_type && typeof p.shape !== 'function')) throw new Error(`part ${p.id}: shape must be a lasergeom polygon, or a function of the built fits F -> polygon`);
       if (p.art !== undefined && p.art !== null && typeof p.art !== 'function') throw new Error(`part ${p.id}: art must be a function drawing the engraving (or null)`);
       if (p.back !== undefined && p.back !== null && typeof p.back !== 'function' && p.back !== true) throw new Error(`part ${p.id}: back must be a function, true (the front mirrored) or null`);
+      if (p.back_score !== undefined && typeof p.back_score !== 'function') throw new Error(`part ${p.id}: back_score must be a function returning the back's score lines`);
+      if (p.back_score && !p.back) throw new Error(`part ${p.id}: back_score needs a back (return EMPTY from back for a back with score lines only)`);
       out.push(Object.assign({ art: null, back: null, name: p.id.replace(/-/g, ' ') }, p));
     }
     for (const p of out) if (p.kind === 'tile' && p.plus) { if (!out.find(q => q.id === p.plus.pair && q.kind === 'pair')) throw new Error(`tile ${p.id}: plus.pair names no pair`); }
@@ -85,7 +87,7 @@
     const holes = unary_union(pockets.map(q => q.notch ? q.hole.union(q.notch) : q.hole));
     const parts = [];
     if (frame) {   /* the back (p.stock) with its art, the frame (thin) with the pockets cut out and the frame_art */
-      parts.push({ pid: p.id, kind: 'tray', stock: p.stock, name: p.name, shape: outer, art: () => p.art ? p.art() : EMPTY, edge: outer });
+      parts.push({ pid: p.id, kind: 'tray', stock: p.stock, name: p.name, shape: outer, art: () => p.art ? p.art() : EMPTY, score: p.score || null, edge: outer });
       const frameShape = outer.difference(holes);
       if (frameShape.geom_type !== 'Polygon') throw new Error(`tray ${p.id}: the pockets cut the frame into pieces`);
       parts.push({ pid: p.id + '-frame', kind: 'tray-frame', stock: frame, name: `${p.name}, pocket layer`, shape: frameShape, art: () => p.frame_art ? p.frame_art() : EMPTY, edge: outer });
@@ -161,7 +163,7 @@
             const registered = keyed(p.id, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, { edge: shape, eng_post: g => K.clip_out(g, site.removed.buffer(1.0)), eng_post_key: 'leaf:' + [fp.plus_bar, fp.plus_w, kerf_of(p.id)].join(',') });
             if (registered) K.leaf_part(lay, p.id, shape, site);
           } else keyed(p.id, shape, `part:${p.id}`, () => p.art ? p.art() : EMPTY, Object.assign({ edge: shape }, p.score ? { score: K.score_lines(p.score()) } : {}));   /* score: blue lines drawn on the part (a dial's ticks, a card's circles) */
-          if (p.back) { setStock(p.id + '-back', p.stock); keyed(p.id + '-back', null, `part:${p.id}:back`, () => K.back_art(shape, p.back === true ? (p.art ? p.art() : EMPTY) : p.back()), { edge: mirrored(shape), back: true }); }
+          if (p.back) { setStock(p.id + '-back', p.stock); keyed(p.id + '-back', null, `part:${p.id}:back`, () => K.back_art(shape, p.back === true ? (p.art ? p.art() : EMPTY) : p.back()), Object.assign({ edge: mirrored(shape), back: true }, p.back_score ? { score: K.score_lines(K.back_art(shape, p.back_score())) } : {})); }   /* back_score: blue lines on the back, mirrored as its art is (a glue-up mark scored, not rastered) */
         };
         const standee = (p) => {
           setStock(p.id, p.stock); setStock(p.id + '-back', p.stock); part_kind[p.id] = 'standee'; part_name[p.id] = p.name; part_key[p.id] = p.key === undefined ? null : p.key;
@@ -184,7 +186,7 @@
         /* a tray with pockets for pieces (the tray competency): the engine's make_tray, registered here */
         const tray = (p) => {
           const T = make_tray(p, { stocks, F, pieceOf: id => { const q = spec.parts.find(r => r.id === id); return q && { shape: q.shape, stock: q.stock }; }, EMPTY });
-          for (const q of T.parts) { setStock(q.pid, q.stock); part_kind[q.pid] = q.kind; part_name[q.pid] = q.name; keyed(q.pid, q.shape, `part:${q.pid}`, q.art, { edge: q.edge }); }
+          for (const q of T.parts) { setStock(q.pid, q.stock); part_kind[q.pid] = q.kind; part_name[q.pid] = q.name; keyed(q.pid, q.shape, `part:${q.pid}`, q.art, Object.assign({ edge: q.edge }, q.score ? { score: K.score_lines(q.score()) } : {})); }   /* a tray's score: blue lines on its back (the walnut floor under the pockets) */
           trays[p.id] = T.meta;
         };
         const pair = (p) => {
