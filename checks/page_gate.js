@@ -167,14 +167,14 @@ async function main() {
     const idle = () => pg.waitForFunction(() => !window.__manual.turning);
     const pageIs = async n => { await idle(); assert.equal(await pg.evaluate(() => window.__manual.page), n); };
     const clickPage = async (id, fx = .5) => { const r = await pg.locator(id).boundingBox(); await pg.mouse.click(r.x + r.width * fx, r.y + r.height * .5); };
+    /* a click turns the leaf in about a quarter of a second: a recorder inside the page watches every animation frame of the turn (the
+       strips, their 3D transforms, the shadow's opacity) and the assertions read it once the leaf has landed, so no round trip has to land
+       inside the turn (2026-09-22: two separate evaluates missed a four-page book's turn) */
+    await pg.evaluate(() => { const rec = window.__turnRecord = { frames: 0, strips: 0, hinged: false, shadow: 0, done: false }; const f = () => { const m = window.__manual; if (m.turning) { rec.frames++; const st = [...document.querySelectorAll('#book .manual-strip')]; if (st.length && st.every(e => getComputedStyle(e).transform.startsWith('matrix3d('))) { rec.hinged = true; rec.strips = Math.max(rec.strips, m.strips); } const g = document.querySelector('#book .manual-ground'); if (g) rec.shadow = Math.max(rec.shadow, +getComputedStyle(g).opacity); } if (!rec.done) requestAnimationFrame(f); }; requestAnimationFrame(f); });
     await clickPage('#p1');   /* a click on the right page turns forward */
-    /* the leaf is in the air for about 900 ms: read the strips and the shadow in one evaluate at mid-turn, so a second round trip cannot land after the curl is gone (2026-09-22: a four-page book turned before a separate locator found the ground) */
-    const inAir = await pg.waitForFunction(() => {
-      const p = window.__manual.progress; if (!(p > .2 && p < .8)) return null;
-      const strips = [...document.querySelectorAll('#book .manual-strip')], ground = document.querySelector('#book .manual-ground');
-      return { strips: window.__manual.strips, hinged: strips.length > 0 && strips.every(e => getComputedStyle(e).transform.startsWith('matrix3d(')), shadow: ground ? +getComputedStyle(ground).opacity : -1 };
-    }, null, { polling: 'raf' });
-    const turning = await inAir.jsonValue();
+    await idle();
+    const turning = await pg.evaluate(() => { window.__turnRecord.done = true; return window.__turnRecord; });
+    assert(turning.frames >= 2, 'the turn was animated over several frames');
     assert(turning.strips >= 5 && turning.hinged, 'the turning leaf is drawn as hinged strips in 3D');
     assert(turning.shadow > 0, 'the turning leaf throws a shadow on the table');
     await pg.screenshot({ path:path.join(shots, 'manual-turn.png'), animations:'allow' });
