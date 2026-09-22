@@ -100,9 +100,24 @@
   const pick = a => a[Math.floor(qr() * a.length)];
   const countIllegal = (e, why) => { illegal++; log(`<b>ILLEGAL</b> ${escH(e.type)}: ${escH(why)}`, 'sys'); };
 
+  /* the gap between two renderer bases (measureSettled's measure, and settle's): the origin's move in millimetres, or a unit axis's move with a tenth
+     counting as a millimetre, whichever is larger; a half turn in the plane scores 20, a turned-over piece 20, a piece 2 mm short of its spot 2 */
+  const basisGap = (b, a) => Math.max(...['O', 'U', 'V', 'N'].map(key => Math.hypot(b[key][0] - a[key][0], b[key][1] - a[key][1], b[key][2] - a[key][2]) * (key === 'O' ? 1 : 10)));
+  /* the table settles a piece through this: rest() (synchronous) takes the piece from its tween's last frame to its rest pose (a flip group dropped,
+     a landed disc re-posed from its record), and the gap between the piece's basis before and after is the snap the viewer would see; it goes into
+     window.__maxSnap, __snapLog and __snapWorst under the part id, so verify_anim fails an animation whose last frame is not its rest pose.
+     measureSettled cannot see this snap: by the time it measures, the table has already applied the rest pose */
+  function settle(inst, rest) {
+    const before = inst && inst.part ? scene.basis(inst) : null; const r = rest();
+    if (before) { const after = scene.basis(inst), mm = basisGap(before, after), pid = inst.part.pid;
+      window.__maxSnap = Math.max(window.__maxSnap || 0, mm);
+      if (mm > (window.__snapWorst ? window.__snapWorst.mm : 0)) window.__snapWorst = { pid, mm: +mm.toFixed(2), turn: G && G.turn, settle: true };
+      if (mm > 0.3) (window.__snapLog = window.__snapLog || []).push({ turn: G && G.turn, pid, mm: +mm.toFixed(2), settle: true, from: before.O.map(v => +v.toFixed(2)), to: after.O.map(v => +v.toFixed(2)) }); }
+    return r;
+  }
   /* ------------------------------------------------------------ GAME: everything the game brings, through one call */
   const api = { S, R3, META, PARTS, PACKING, JIG, SHOWCASE, scene, $, el, need, part, mk, posed, setPose, rotXY, ez, STOCK_T, STOCK_MAT, stockOf, kindOf, isVertical, DIM, IN, IX, IY, tray, walls, neck, standingPair, standee, exFor, addAsm, trayEx, neckEx, lidOn,
-    tween, uiTween, wait, arc, log, escH, pick, illegal: countIllegal, markDirty: () => { dirty = true; }, get qr() { return qr; }, get G() { return G; },
+    tween, uiTween, wait, arc, log, escH, pick, illegal: countIllegal, markDirty: () => { dirty = true; }, settle, get qr() { return qr; }, get G() { return G; },
     focus: { get cell() { return focusCell; }, set cell(v) { focusCell = v; } } };
   const GT = GameTable(api);
   for (const k of ['NP', 'players', 'T', 'BOXO', 'LIDO', 'BOXA', 'LIDA', 'initTable', 'setBoardFromState', 'animateEvents', 'resetShown', 'syncShown', 'syncBoard', 'finale', 'clearTable']) if (GT[k] === undefined) throw new Error(`GameTable returned no ${k}: table.js must provide it (engine/README.md)`);
@@ -354,13 +369,14 @@
   /* the settled pose: once a turn's animation is over, every piece must already be exactly where the game's own re-pose from the engine state puts
      it, compared as the renderer sees it (position, turn, flip, standing, groups: the whole basis), so an animation that ends short of its pose and
      snaps is caught (owner, 2026-09-19: "the loot does not land on the cat correctly and snaps to the correct pose at the end of the animation.
-     this seems like it could be an engine level unit test"); the worst piece is reported in window.__snapWorst */
+     this seems like it could be an engine level unit test"); the worst piece is reported in window.__snapWorst. A snap the table applies itself, inside
+     the animation (its own rest pose at the end of a tween), is measured where it happens, by api.settle */
   function measureSettled() {
     const insts = T.static.concat(T.dynamic).filter(i => i.part);
     const poses = () => { const by = new Map(); for (const i of insts) { if (i.hidden) continue; const pid = i.part.pid; if (!by.has(pid)) by.set(pid, []); by.get(pid).push(scene.basis(i)); } return by; };
     const before = poses(); setBoardFromState(G); GT.syncShown(G); dirty = true; const after = poses();
     /* two copies of one part are interchangeable (the re-pose may deal the other disc): each shown piece is matched to the nearest shown copy of its part */
-    const gap = (b, a) => Math.max(...['O', 'U', 'V', 'N'].map(key => Math.hypot(b[key][0] - a[key][0], b[key][1] - a[key][1], b[key][2] - a[key][2]) * (key === 'O' ? 1 : 10)));   /* a unit axis off by 0.1 counts as a millimetre */
+    const gap = basisGap;   /* a unit axis off by 0.1 counts as a millimetre */
     let worst = 0, who = null;
     for (const pid of new Set([...before.keys(), ...after.keys()])) {
       const B = before.get(pid) || [], A0 = after.get(pid) || [], A = A0.slice();
