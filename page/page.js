@@ -946,9 +946,9 @@
     const glue = (m, c) => { if (!GLUED.has(m)) GLUED.set(m, new Set()); GLUED.get(m).add(c); };
     for (const [tid, tr] of Object.entries(META.trays || {})) if (tr.frame && PARTS[tid + '-frame']) glue(tid + '-frame', tid);
     for (const [c, m] of (GT.glued || [])) glue(m, c);
-    /* a mate lies on its carrier: turned the same way, at the carrier's top, its origin inside the carrier's footprint (co-centred, as a face on its hex, or offset, as a tile in its tray's pocket) */
+    /* a mate lies on its carrier: at the carrier's top, its origin inside the carrier's footprint (co-centred, as a face on its hex, or offset, as a tile in its tray's pocket) */
     const onTop = (m, c, ct, cbox) => { const r = -(c.rot || 0) * Math.PI / 180, dx = m.x - c.x, dy = m.y - c.y, u = dx * Math.cos(r) - dy * Math.sin(r), v = dx * Math.sin(r) + dy * Math.cos(r);
-      return u > cbox[0] - 0.05 && u < cbox[2] + 0.05 && v > cbox[1] - 0.05 && v < cbox[3] + 0.05 && Math.abs(((((m.rot || 0) - (c.rot || 0)) % 360) + 360) % 360) < 0.01 && Math.abs(m.z - (c.z + ct)) < 0.35; };
+      return u > cbox[0] - 0.05 && u < cbox[2] + 0.05 && v > cbox[1] - 0.05 && v < cbox[3] + 0.05 && Math.abs(m.z - (c.z + ct)) < 0.35; };   /* any turn: a used tile lies turned and face down in its pocket, and rides that way */
     for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => GLUED.get(sl.pid).has(o.pid) && o.pile === sl.pile && onTop(sl, o, o.thick, part(o.pid).bbox)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${[...GLUED.get(sl.pid)].join(' or ')} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
     slots = slots.filter(sl => !GLUED.has(sl.pid));
     for (const sl of slots) sl.fat = sl.thick + (sl.mates || []).reduce((a, m) => a + m.thick, 0);
