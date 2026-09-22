@@ -364,3 +364,18 @@ Every entry is a message in which the owner corrected, rejected or redirected th
 ## Added 2026-09-21, BOX 60 shoulder-box fit
 
 - [2026-09-21] **reduce neck-lid clearance by half** — "reduce neck-lid clearance by half." → Engine `FIT.lid_ease` 0.10 → 0.05 mm a side (grip-to-lid). `base_ease` stays 0.10. Default for every project, not a per-game override.
+
+## Added 2026-09-21, the TUMBLER rulebook and page
+
+- [2026-09-21] **Rulebook headings** — "can you rewrite the rulebook to remove the AI slop? it looks like a bunch of slogan fragments. 'every turn, in this order'" → Headings are plain noun phrases that name their subject; no slogan fragments, no comma-and headings.
+- [2026-09-21] **No reading guides, no fun text** — "'pages 2 to 11 teach the game blah blah blah' on the cover is EXACTLY what I mean by slop. get rid of this and all the unnecessary crap like it." and "the manual isn't the place for fun text. it's the place to avoid making the players read an encyclopedia and still feel stupid and frustrated." → Every rule once, nothing else.
+- [2026-09-21] **The cover line** — "'a game for two to four players, from eight years up, in about thirty minutes' - change to 'a game for two to four players'" → Exactly that line.
+- [2026-09-21] **Length** — "why is there just SO MUCH text? if every rule were explained succinctly, exactly once, how many pages would there be? like 3 at most?" → Four pages (a multiple of four) for a light game; TUMBLER went from sixteen to four.
+- [2026-09-21] **Figurative lines** — "'the wheel you turn is the maze the next cat faces' wtf man just delete everything that isn't plainly stating the rules." → Delete anything that is not a rule.
+- [2026-09-21] **The setup figure** — "'Setting up' could be a bit more visual." then "the setup diagram you put on the page has the board and the lid sideways and the tray could probably be bigger." → The real table drawn from the cut files, each part turned so its lettering reads, lettered, the tray at full size.
+- [2026-09-21] **A figure that shows a move** — "take a good look at figure 7" (a flying arrow over the wheels and a line of tiny text) → Counted steps through marked crossings, then the result in a second row.
+- [2026-09-21] **Rebuild to show** — "i can't see the rulebook until you rebuild" → `bg page` after every change to the book.
+- [2026-09-21] **Parallel agents** — "parallelize work with agents btw." → Independent fixes (art, animation, text) go to agents at the same time, each on its own files.
+- [2026-09-21] **The settled pose is a unit test** — "when the ability tokens flip over when they are used, they are initially right side up and then snap to upside down. there is supposed to be a unit test that asserts that the final pose of an animation is reached by the animation." → `api.settle(inst, rest)` in the engine (b5e291a): the gap between a tween's last frame and the rest pose fails `verify_anim`. The cause: a `flipped` part rests turned over about its x axis while back art is mirrored for a y-axis turn, so a resting flipped tile needs rot + 180 (the loot discs already did).
+- [2026-09-21] **The tray's favourite glyph** — "align the 5 with the icon properly." → Centred on the digit's mid-height, 2.3 mm from it.
+- [2026-09-21] **The dial's dog** — "the watchdog dial art still isn't recognizable as a dog." → Redrawn with the floppy ear and the snout as the tells, judged blind ("what animal is this?").

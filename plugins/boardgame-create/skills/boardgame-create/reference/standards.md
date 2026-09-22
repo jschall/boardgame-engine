@@ -81,7 +81,7 @@ Owner's words are quoted where the standard came from one. "Check:" says how it 
 ## H. The rulebook
 
 - **H1. End-user only.** Nothing about cutting, production, kerf, glue, jigs or assembly in the rulebook; those live on the page's files modal and in the skill. Check: `manual/verify.js` and `check-references.js`; judge-rules.
-- **H2. Structure, voice and design** as `reference/manual.md`: cover, what's in the box with what each piece does, setup with exact maps per player count, the turn, worked examples, end and scoring, reference (rulings, glossary, keep-open summary, index); plain sentences a patient friend would say; two reading paths; figures from the cut files; the small-parts warning. Check: `manual/verify.js` (every printed number from the engine), `check-references.js`, `review-layout.js` (no overflow, no orphans); judge-rules until no GUESS and no wrong answers.
+- **H2. Structure, voice and design** as `reference/manual.md`: the cover (the title art, "A game for two to four players", the warning), the pieces, the setup with the real table drawn upright and lettered, the turn, the special piece and the end; every rule once, in plain sentences, in play order; figures from the cut files only where they carry a rule; no examples, glossary, questions page or index unless the owner asks; four pages for a light game. Check: `manual/verify.js`; judge-rules; the plain-English audit.
 - **H3. Commercial quality, judged.** Catan-grade: iterated with a fresh independent judge until it grades A; the cover and every figure match the current art. Check: `iterations.md`.
 
 ## I. The 3D animation
