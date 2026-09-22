@@ -946,14 +946,16 @@
     const glue = (m, c) => { if (!GLUED.has(m)) GLUED.set(m, new Set()); GLUED.get(m).add(c); };
     for (const [tid, tr] of Object.entries(META.trays || {})) if (tr.frame && PARTS[tid + '-frame']) glue(tid + '-frame', tid);
     for (const [c, m] of (GT.glued || [])) glue(m, c);
-    const onTop = (m, c, ct) => Math.abs(m.x - c.x) < 0.05 && Math.abs(m.y - c.y) < 0.05 && Math.abs(((((m.rot || 0) - (c.rot || 0)) % 360) + 360) % 360) < 0.01 && Math.abs(m.z - (c.z + ct)) < 0.35;
-    for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => GLUED.get(sl.pid).has(o.pid) && o.pile === sl.pile && onTop(sl, o, o.thick)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${[...GLUED.get(sl.pid)].join(' or ')} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
+    /* a mate lies on its carrier: turned the same way, at the carrier's top, its origin inside the carrier's footprint (co-centred, as a face on its hex, or offset, as a tile in its tray's pocket) */
+    const onTop = (m, c, ct, cbox) => { const r = -(c.rot || 0) * Math.PI / 180, dx = m.x - c.x, dy = m.y - c.y, u = dx * Math.cos(r) - dy * Math.sin(r), v = dx * Math.sin(r) + dy * Math.cos(r);
+      return u > cbox[0] - 0.05 && u < cbox[2] + 0.05 && v > cbox[1] - 0.05 && v < cbox[3] + 0.05 && Math.abs(((((m.rot || 0) - (c.rot || 0)) % 360) + 360) % 360) < 0.01 && Math.abs(m.z - (c.z + ct)) < 0.35; };
+    for (const sl of slots) if (GLUED.has(sl.pid)) { const c = slots.find(o => GLUED.get(sl.pid).has(o.pid) && o.pile === sl.pile && onTop(sl, o, o.thick, part(o.pid).bbox)); if (!c) throw new Error(`the opening: ${sl.pid} is glued onto ${[...GLUED.get(sl.pid)].join(' or ')} but packing.json does not pack it on one`); (c.mates = c.mates || []).push(sl); }
     slots = slots.filter(sl => !GLUED.has(sl.pid));
     for (const sl of slots) sl.fat = sl.thick + (sl.mates || []).reduce((a, m) => a + m.thick, 0);
     const G3 = geomOf();
     for (const sl of slots) { const f = { part: part(sl.pid), thick: sl.fat, vertical: false }; sl.b = G3.box(f, sl.S); sl.pts = G3.pts(f, sl.S); }
     let insts = T.static.concat(T.dynamic).filter(inst => !boxIds.has(inst.id) && !inst.hidden);
-    for (const m of insts) if (GLUED.has(m.part.pid)) { const c = insts.find(o => o.part.pid === GLUED.get(m.part.pid) && onTop(m, o, o.thick)); if (!c) throw new Error(`the opening: ${m.part.pid} is glued onto ${GLUED.get(m.part.pid)} but the table does not show it on one`); (c._mates = c._mates || []).push(m); }
+    for (const m of insts) if (GLUED.has(m.part.pid)) { const c = insts.find(o => GLUED.get(m.part.pid).has(o.part.pid) && onTop(m, o, o.thick, o.part.bbox)); if (!c) throw new Error(`the opening: ${m.part.pid} is glued onto ${[...GLUED.get(m.part.pid)].join(' or ')} but the table does not show it on one`); (c._mates = c._mates || []).push(m); }
     insts = insts.filter(inst => !GLUED.has(inst.part.pid));
     for (const inst of insts) { inst._sig = outlineSig(inst); const E = scene.basis(inst); inst._E = E; const f = { part: inst.part, thick: inst.thick + (inst._mates || []).reduce((a, m) => a + m.thick, 0), vertical: inst.vertical }; inst._fat = f.thick; inst._b = G3.box(f, E); inst._pts = G3.pts(f, E); }
     const bySig = new Map(); for (const sl of slots) { if (!bySig.has(sl.sig)) bySig.set(sl.sig, []); bySig.get(sl.sig).push(sl); }
@@ -1023,7 +1025,8 @@
       pairs.forEach(([inst, sl]) => { const S = scene.basis({ part: inst.part, x: sl.x, y: sl.y, z: sl.z, rot: sl.rot, flipped: !!inst.flipped, thick: inst.thick });
         const q = tweenRecord(inst, S); q.slot = sl; q.seq = sl.seq; q.band = sl.band; q.vertical = !!inst.vertical; q.thick = inst._fat;
         /* a glued mate: its packed pose is the carrier's plus the offset it keeps on the table, so the pair is rigid in the box as on the table */
-        q.mates = (inst._mates || []).map(m => { const Sm = scene.basis({ part: m.part, x: sl.x, y: sl.y, z: sl.z + (m.z - inst.z), rot: sl.rot, flipped: !!m.flipped, thick: m.thick }); const mq = tweenRecord(m, Sm); mq.d = V3.sub(mq.PE, q.PE); return mq; });
+        q.mates = (inst._mates || []).map(m => { const dr = ((sl.rot || 0) - (inst.rot || 0)) * Math.PI / 180, ox = m.x - inst.x, oy = m.y - inst.y;   /* the mate keeps its offset and turn on the carrier, in the box as on the table */
+          const Sm = scene.basis({ part: m.part, x: sl.x + ox * Math.cos(dr) - oy * Math.sin(dr), y: sl.y + ox * Math.sin(dr) + oy * Math.cos(dr), z: sl.z + (m.z - inst.z), rot: (sl.rot || 0) + ((m.rot || 0) - (inst.rot || 0)), flipped: !!m.flipped, thick: m.thick }); const mq = tweenRecord(m, Sm); mq.d = V3.sub(mq.PE, q.PE); return mq; });
         pieces.push(q); });
     }
     for (const inst of insts) { delete inst._sig; delete inst._E; delete inst._b; delete inst._pts; delete inst._fat; delete inst._mates; }
